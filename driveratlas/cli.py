@@ -11,7 +11,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
-from .scanner import scan_driver
+from .scanner import scan_driver, DriverProfile
 from .framework_detect import FrameworkClassifier
 from .scoring import AttackSurfaceScorer
 from .corpus import Corpus
@@ -97,18 +97,54 @@ def scan(path, recursive, fmt, output):
             console.print(text)
 
 
+def _profile_from_yaml(path: str) -> DriverProfile:
+    """Reconstruct a DriverProfile from a corpus YAML entry."""
+    with open(path) as f:
+        d = yaml.safe_load(f)
+    # Corpus entries don't store the raw imports dict — rebuild from api_categories
+    # which stores {category: [func_names]}. Put all funcs under a synthetic DLL key
+    # so the scorer's flat import lookup works.
+    imports = d.get("imports", {})
+    if not imports:
+        all_funcs = []
+        for funcs in d.get("api_categories", {}).values():
+            all_funcs.extend(funcs)
+        if all_funcs:
+            imports = {"ntoskrnl.exe": all_funcs}
+    return DriverProfile(
+        name=d.get("filename", d.get("name", os.path.basename(path))),
+        sha256=d.get("sha256", ""),
+        size=d.get("size", 0),
+        signer=d.get("signer"),
+        framework=d.get("framework", "unknown"),
+        framework_confidence=d.get("framework_confidence", 0.0),
+        import_count=d.get("import_count", 0),
+        imports=imports,
+        device_names=d.get("device_names", []),
+        symbolic_links=d.get("symbolic_links", []),
+        notable_strings=d.get("notable_strings", []),
+        company_name=d.get("company_name"),
+        product_name=d.get("product_name"),
+        file_description=d.get("file_description"),
+    )
+
+
 @main.command()
 @click.argument("path")
-@click.option("-r", "--recursive", is_flag=True, help="Scan directory recursively for .sys files")
+@click.option("-r", "--recursive", is_flag=True, help="Scan directory recursively for .sys/.yaml files")
 @click.option("-f", "--format", "fmt", type=click.Choice(["table", "json"]), default="table")
 @click.option("--min-score", type=float, default=0.0, help="Only show drivers with score >= this value")
 @click.option("-o", "--output", type=click.Path(), help="Write output to file")
 def rank(path, recursive, fmt, min_score, output):
-    """Rank drivers by attack surface score."""
+    """Rank drivers by attack surface score.
+
+    Accepts .sys binaries (scanned live) or .yaml corpus entries.
+    """
     classifier = _get_classifier()
     cats_path = _CATEGORIES_PATH if os.path.exists(_CATEGORIES_PATH) else None
     scorer = AttackSurfaceScorer(_ATTACK_SURFACE_PATH)
 
+    _RANKABLE = (".sys", ".yaml", ".yml")
     targets = []
     if os.path.isfile(path):
         targets.append(path)
@@ -116,24 +152,27 @@ def rank(path, recursive, fmt, min_score, output):
         if recursive:
             for root, _dirs, files in os.walk(path):
                 targets.extend(
-                    os.path.join(root, f) for f in files if f.lower().endswith(".sys")
+                    os.path.join(root, f) for f in files if f.lower().endswith(_RANKABLE)
                 )
         else:
             targets.extend(
-                os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith(".sys")
+                os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith(_RANKABLE)
             )
     else:
         console.print(f"[red]Path not found:[/] {path}")
         sys.exit(1)
 
     if not targets:
-        console.print("[yellow]No .sys files found.[/]")
+        console.print("[yellow]No .sys or .yaml files found.[/]")
         return
 
     results = []
     for t in sorted(targets):
         try:
-            profile = scan_driver(t, classifier=classifier, categories_path=cats_path)
+            if t.lower().endswith((".yaml", ".yml")):
+                profile = _profile_from_yaml(t)
+            else:
+                profile = scan_driver(t, classifier=classifier, categories_path=cats_path)
             score = scorer.score(profile)
             if score.total >= min_score:
                 results.append((profile, score))
