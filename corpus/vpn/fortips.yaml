@@ -1,0 +1,110 @@
+name: fortips
+filename: fortips.sys
+category: vpn
+vendor: Fortinet
+source: local
+scan_date: '2026-02-23T08:14:10.489505+00:00'
+sha256: 3b583cf2fc6e329b35173f852da3dd1691db3063cd14afc84cbecbb0deeb1c47
+size: 213928
+machine: x64
+subsystem: native
+linker_version: '14.29'
+signer: DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1
+product_name: Fortinet FortiClient
+file_description: FortiClient IPSec Driver
+company_name: Fortinet Inc
+file_version: 2025.11.20.0
+framework: wdm_raw
+framework_confidence: 0.875
+secondary_frameworks: []
+import_count: 96
+api_categories:
+  synchronization:
+  - KeAcquireInStackQueuedSpinLock
+  - KeInitializeEvent
+  - KeReleaseInStackQueuedSpinLock
+  - KeReleaseSpinLock
+  - KeSetEvent
+  - KeWaitForMultipleObjects
+  - KeWaitForSingleObject
+  memory_management:
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmAllocatePagesForMdl
+  - MmFreePagesFromMdl
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  process_thread:
+  - PsCreateSystemThread
+  - PsTerminateSystemThread
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  file_ops:
+  - ZwClose
+  - ZwCreateFile
+  - ZwWriteFile
+  registry:
+  - ZwOpenKey
+  - ZwQueryValueKey
+  irp_handling:
+  - IoBuildDeviceIoControlRequest
+  - IofCallDriver
+  - IofCompleteRequest
+  device_mgmt:
+  - IoCreateDevice
+  - IoCreateSymbolicLink
+  - IoDeleteDevice
+  - IoDeleteSymbolicLink
+  - IoGetDeviceObjectPointer
+  string_handling:
+  - RtlAnsiStringToUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  - RtlUnicodeStringToAnsiString
+  mdl_ops:
+  - IoAllocateMdl
+  - IoFreeMdl
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  network:
+  - NdisGetDataBuffer
+device_names:
+- \DEVICE\NDISWANIP
+- \Device\FORTIPS
+- \Device\fortifilter
+symbolic_links:
+- \DosDevices\FORTIPS
+registry_paths:
+- \REGISTRY\MACHINE\SOFTWARE\Fortinet\FortiClient
+- \REGISTRY\MACHINE\Software\fctlog\
+sections:
+- name: .text
+  virtual_size: 142193
+  raw_size: 142336
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 34592
+  raw_size: 34816
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 10968
+  raw_size: 6144
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 3816
+  raw_size: 4096
+  characteristics: '0x48000040'
+- name: INIT
+  virtual_size: 3028
+  raw_size: 3072
+  characteristics: '0x62000020'
+- name: .rsrc
+  virtual_size: 904
+  raw_size: 1024
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 188
+  raw_size: 512
+  characteristics: '0x42000040'

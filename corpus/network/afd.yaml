@@ -1,0 +1,174 @@
+name: afd
+filename: afd.sys
+category: network
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:15.549830+00:00'
+sha256: d71cebccabb6383ded5ca3b49e0a442fb90724a4b791f7367994cf9868fce858
+size: 697824
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: Ancillary Function Driver for WinSock
+company_name: Microsoft Corporation
+file_version: 10.0.22621.3952 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.625
+secondary_frameworks: []
+import_count: 304
+api_categories:
+  string_handling:
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlInitUnicodeString
+  file_ops:
+  - ZwClose
+  synchronization:
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseResourceLite
+  - KeAcquireInStackQueuedSpinLock
+  - KeAcquireSpinLockAtDpcLevel
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeLeaveCriticalRegion
+  - KeReleaseInStackQueuedSpinLock
+  - KeReleaseSpinLock
+  - KeReleaseSpinLockFromDpcLevel
+  - KeResetEvent
+  - KeSetEvent
+  - KeWaitForMultipleObjects
+  - KeWaitForSingleObject
+  irp_handling:
+  - IoAllocateIrp
+  - IoBuildDeviceIoControlRequest
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  etw_tracing:
+  - EtwActivityIdControl
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  - IoWMIWriteEvent
+  process_thread:
+  - KeGetCurrentIrql
+  - PsGetCurrentProcess
+  - PsGetCurrentProcessId
+  - PsLookupProcessByProcessId
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePool3
+  - ExFreePoolWithTag
+  - MmMapLockedPages
+  - MmMapLockedPagesSpecifyCache
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  security:
+  - ExGetPreviousMode
+  - IoIs32bitProcess
+  - ProbeForWrite
+  - SeAccessCheck
+  - SeFreePrivileges
+  device_mgmt:
+  - IoCreateDevice
+  - IoDeleteDevice
+  timer_dpc:
+  - ExQueueWorkItem
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - IoQueueWorkItem
+  - KeCancelTimer
+  - KeDelayExecutionThread
+  - KeInitializeDpc
+  - KeInitializeTimer
+  - KeInitializeTimerEx
+  - KeSetTimer
+  registry:
+  - ZwQueryValueKey
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+device_names:
+- \Device\Afd
+- \Device\BTHMS_RFCOMM
+- \Device\RawIp
+- \Device\RawIp6
+- \Device\Tcp
+- \Device\Tcp6
+- \Device\Udp
+- \Device\Udp6
+symbolic_links: []
+registry_paths:
+- \Registry\Machine\System\CurrentControlSet\Services\Afd
+sections:
+- name: .text
+  virtual_size: 316294
+  raw_size: 319488
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 38432
+  raw_size: 40960
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 3240
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 18228
+  raw_size: 20480
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 12666
+  raw_size: 16384
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 89933
+  raw_size: 90112
+  characteristics: '0x60000020'
+- name: PAGEWPP
+  virtual_size: 5459
+  raw_size: 8192
+  characteristics: '0x60000020'
+- name: PAGESAN
+  virtual_size: 17949
+  raw_size: 20480
+  characteristics: '0x60000020'
+- name: PAGEWTDI
+  virtual_size: 18324
+  raw_size: 20480
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: PAGEDATA
+  virtual_size: 352
+  raw_size: 4096
+  characteristics: '0xC0000040'
+- name: INIT
+  virtual_size: 7632
+  raw_size: 8192
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 1560
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 101704
+  raw_size: 102400
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 19216
+  raw_size: 20480
+  characteristics: '0x42000040'

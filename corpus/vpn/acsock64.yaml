@@ -1,0 +1,127 @@
+name: acsock64
+filename: acsock64.sys
+category: vpn
+vendor: Cisco
+source: local
+scan_date: '2026-02-23T08:14:10.318937+00:00'
+sha256: e9048c49e3500f4d7b5708b9e26e0897407cb80dd09b450808be5fbe5990fa31
+size: 490592
+machine: x64
+subsystem: native
+linker_version: '14.29'
+signer: Microsoft Windows Hardware Compatibility Publisher
+product_name: Cisco Secure Client
+file_description: Cisco Secure Client Kernel Driver Framework Socket Layer Interceptor
+company_name: Cisco Systems, Inc.
+file_version: 5, 1, 14, 83
+framework: wfp_callout
+framework_confidence: 0.756
+secondary_frameworks:
+- wdm_raw
+- kmdf
+import_count: 147
+api_categories:
+  network:
+  - FwpmEngineClose0
+  - FwpmEngineOpen0
+  - FwpmFilterAdd0
+  - FwpmSubLayerAdd0
+  - FwpsAcquireClassifyHandle0
+  - FwpsCalloutRegister0
+  - FwpsCalloutRegister1
+  - FwpsReleaseClassifyHandle0
+  - NdisAllocateNetBufferListPool
+  - NdisFreeNetBufferListPool
+  - NdisGetDataBuffer
+  - WskCaptureProviderNPI
+  - WskReleaseProviderNPI
+  memory_management:
+  - ExAllocatePool
+  - ExAllocatePoolWithTag
+  - ExFreePool
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  irp_handling:
+  - IoAllocateIrp
+  - IoFreeIrp
+  - IofCompleteRequest
+  device_mgmt:
+  - IoCreateDevice
+  - IoCreateSymbolicLink
+  - IoDeleteDevice
+  - IoDeleteSymbolicLink
+  synchronization:
+  - KeInitializeEvent
+  - KeReleaseSpinLock
+  - KeSetEvent
+  - KeWaitForMultipleObjects
+  - KeWaitForSingleObject
+  etw_tracing:
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  string_handling:
+  - RtlCopyUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitUnicodeString
+  - RtlUnicodeStringToAnsiString
+  registry:
+  - ZwCreateKey
+  - ZwOpenKey
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  file_ops:
+  - ZwClose
+  - ZwOpenFile
+  - ZwReadFile
+  mdl_ops:
+  - IoAllocateMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  process_thread:
+  - PsCreateSystemThread
+  - PsTerminateSystemThread
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+device_names:
+- \Device\ngcsock
+- \Device\ngcsocketmux
+symbolic_links:
+- \DosDevices\csskfltr
+registry_paths:
+- \Registry\Machine\System\CurrentControlSet\Control\Class
+- \registry\machine\system\currentcontrolset\services\acsock
+sections:
+- name: .text
+  virtual_size: 418850
+  raw_size: 419328
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 22568
+  raw_size: 23040
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 39480
+  raw_size: 2560
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 15660
+  raw_size: 15872
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 7308
+  raw_size: 7680
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 4904
+  raw_size: 5120
+  characteristics: '0x62000020'
+- name: .rsrc
+  virtual_size: 4280
+  raw_size: 4608
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 1284
+  raw_size: 1536
+  characteristics: '0x42000040'

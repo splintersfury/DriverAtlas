@@ -1,0 +1,56 @@
+name: vhidmini
+filename: vhidmini.sys
+category: kmdf
+vendor: Sample
+source: local
+scan_date: '2026-02-23T08:14:18.163602+00:00'
+sha256: f1eca8030308c50e5c65a57b224a96b0a9793ebdfa9d6e22c318824fc49c28f0
+size: 44880
+machine: x64
+subsystem: native
+linker_version: '14.29'
+signer: GlobalSign GCC R45 EV CodeSigning CA 2020
+product_name: Windows (R) Win 7 DDK driver
+file_description: HID minidriver (KMDF version)
+company_name: Windows (R) Win 7 DDK provider
+file_version: 10.0.10011.16384
+framework: kmdf
+framework_confidence: 0.294
+secondary_frameworks: []
+import_count: 9
+api_categories:
+  string_handling:
+  - RtlCopyUnicodeString
+  - RtlInitUnicodeString
+device_names: []
+symbolic_links: []
+registry_paths: []
+sections:
+- name: .text
+  virtual_size: 7414
+  raw_size: 7680
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 2404
+  raw_size: 2560
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 984
+  raw_size: 512
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 468
+  raw_size: 512
+  characteristics: '0x48000040'
+- name: INIT
+  virtual_size: 412
+  raw_size: 512
+  characteristics: '0x62000020'
+- name: .rsrc
+  virtual_size: 1136
+  raw_size: 1536
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 60
+  raw_size: 512
+  characteristics: '0x42000040'

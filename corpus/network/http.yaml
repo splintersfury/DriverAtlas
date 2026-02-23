@@ -1,0 +1,202 @@
+name: http
+filename: http.sys
+category: network
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:16.062757+00:00'
+sha256: bd1c25f70346969acc9c19792c75ba738dba1d1cb8943831748b9a8cf83ebb5d
+size: 1716512
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: HTTP Protocol Stack
+company_name: Microsoft Corporation
+file_version: 10.0.23154.1000 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.625
+secondary_frameworks: []
+import_count: 443
+api_categories:
+  synchronization:
+  - ExAcquireFastMutex
+  - ExReleaseFastMutex
+  - KeAcquireInStackQueuedSpinLock
+  - KeAcquireSpinLockAtDpcLevel
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeInitializeMutex
+  - KeLeaveCriticalRegion
+  - KeReleaseInStackQueuedSpinLock
+  - KeReleaseMutex
+  - KeReleaseSpinLock
+  - KeReleaseSpinLockFromDpcLevel
+  - KeSetEvent
+  - KeWaitForMultipleObjects
+  - KeWaitForSingleObject
+  registry:
+  - ZwCreateKey
+  - ZwDeleteKey
+  - ZwDeleteValueKey
+  - ZwEnumerateKey
+  - ZwEnumerateValueKey
+  - ZwOpenKey
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  etw_tracing:
+  - EtwActivityIdControl
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  string_handling:
+  - RtlAnsiStringToUnicodeString
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  - RtlUnicodeStringToAnsiString
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePool3
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPages
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  irp_handling:
+  - IoAllocateIrp
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  device_mgmt:
+  - IoCreateDevice
+  - IoDeleteDevice
+  security:
+  - ExGetPreviousMode
+  - IoIs32bitProcess
+  - ProbeForWrite
+  - SeAccessCheck
+  - SeFreePrivileges
+  timer_dpc:
+  - ExQueueWorkItem
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - KeCancelTimer
+  - KeInitializeDpc
+  - KeInitializeTimer
+  - KeSetTimer
+  - KeSetTimerEx
+  file_ops:
+  - ZwClose
+  - ZwCreateFile
+  - ZwQueryDirectoryFile
+  - ZwQueryInformationFile
+  - ZwWriteFile
+  process_thread:
+  - KeGetCurrentIrql
+  - PsCreateSystemThread
+  - PsGetCurrentProcess
+  - PsGetCurrentProcessId
+  - PsTerminateSystemThread
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObReferenceObjectByPointer
+  - ObfDereferenceObject
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDestroyHash
+  - BCryptFinishHash
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names:
+- \Device\Http
+symbolic_links:
+- \dosdevices\UNC
+registry_paths:
+- \Registry\Machine\System\CurrentControlSet\Control\ComputerName\ComputerName
+- \Registry\Machine\System\CurrentControlSet\Control\Nls\CodePage
+- \Registry\Machine\System\CurrentControlSet\Services\Http
+- \Registry\Machine\System\CurrentControlSet\Services\Http\Parameters
+- \Registry\Machine\System\CurrentControlSet\Services\Http\Parameters\SslBindingInfo
+- \Registry\Machine\System\CurrentControlSet\Services\Http\Parameters\SslCcsBindingInfo
+- \Registry\Machine\System\CurrentControlSet\Services\Http\Parameters\SslScopedCcsBindingInfo
+- \Registry\Machine\System\CurrentControlSet\Services\Http\Parameters\SslSniBindingInfo
+- \Registry\Machine\System\CurrentControlSet\Services\Http\Parameters\UrlAclInfo
+sections:
+- name: .text
+  virtual_size: 492404
+  raw_size: 495616
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 105944
+  raw_size: 106496
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 21940
+  raw_size: 12288
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 54792
+  raw_size: 57344
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 18426
+  raw_size: 20480
+  characteristics: '0x48000040'
+- name: ROHTTPRE
+  virtual_size: 13880
+  raw_size: 16384
+  characteristics: '0x48000040'
+- name: NONPAGE
+  virtual_size: 176
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: PAGEWPP
+  virtual_size: 71023
+  raw_size: 73728
+  characteristics: '0x60000020'
+- name: PAGE
+  virtual_size: 681781
+  raw_size: 684032
+  characteristics: '0x60000020'
+- name: PAGESSL
+  virtual_size: 12789
+  raw_size: 16384
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: PAGECONS
+  virtual_size: 14243
+  raw_size: 16384
+  characteristics: '0x40000040'
+- name: INIT
+  virtual_size: 8931
+  raw_size: 12288
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 2580
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 144576
+  raw_size: 147456
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 34856
+  raw_size: 36864
+  characteristics: '0x42000040'

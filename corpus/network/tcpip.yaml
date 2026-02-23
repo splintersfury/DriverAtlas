@@ -1,0 +1,233 @@
+name: tcpip
+filename: tcpip.sys
+category: network
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:15.159554+00:00'
+sha256: 7cfb330c436cf064755961a3ed4f304148a2af19d325ef30a91f217958de55e7
+size: 3298696
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: TCP/IP Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.3958 (WinBuild.160101.0800)
+framework: ndis_protocol
+framework_confidence: 1.0
+secondary_frameworks:
+- wfp_callout
+- wdm_raw
+import_count: 790
+api_categories:
+  registry:
+  - RtlWriteRegistryValue
+  - ZwEnumerateKey
+  - ZwOpenKey
+  - ZwQueryValueKey
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  string_handling:
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  - RtlUnicodeStringToAnsiString
+  timer_dpc:
+  - ExQueueWorkItem
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - IoQueueWorkItem
+  - KeCancelTimer
+  - KeDelayExecutionThread
+  - KeInitializeDpc
+  - KeInitializeTimer
+  - KeInitializeTimerEx
+  - KeInsertQueueDpc
+  - KeSetTimer
+  - KeSetTimerEx
+  irp_handling:
+  - IoAllocateIrp
+  - IoBuildDeviceIoControlRequest
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  process_thread:
+  - KeGetCurrentIrql
+  - PsCreateSystemThread
+  - PsGetCurrentProcess
+  - PsGetCurrentProcessId
+  file_ops:
+  - ZwClose
+  - ZwCreateFile
+  device_mgmt:
+  - IoCreateDevice
+  - IoCreateSymbolicLink
+  - IoDeleteDevice
+  - IoDeleteSymbolicLink
+  - IoGetDeviceObjectPointer
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePool3
+  - ExAllocatePoolWithQuotaTag
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  security:
+  - ExGetPreviousMode
+  - IoIs32bitProcess
+  - SeAccessCheck
+  etw_tracing:
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  synchronization:
+  - ExAcquireFastMutex
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseFastMutex
+  - ExReleaseResourceLite
+  - KeAcquireInStackQueuedSpinLock
+  - KeAcquireSpinLockAtDpcLevel
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeInitializeMutex
+  - KeLeaveCriticalRegion
+  - KeReleaseInStackQueuedSpinLock
+  - KeReleaseMutex
+  - KeReleaseSpinLock
+  - KeReleaseSpinLockFromDpcLevel
+  - KeSetEvent
+  - KeWaitForSingleObject
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  power_pnp:
+  - PoRegisterPowerSettingCallback
+  network:
+  - FwpmEngineClose0
+  - FwpmEngineOpen0
+  - FwpsAcquireClassifyHandle0
+  - FwpsFlowAssociateContext0
+  - FwpsReleaseClassifyHandle0
+  - NdisAllocateNetBufferListPool
+  - NdisFreeNetBufferListPool
+  - NdisGetDataBuffer
+  - NdisSendNetBufferLists
+  - WskCaptureProviderNPI
+  - WskReleaseProviderNPI
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDecrypt
+  - BCryptDestroyHash
+  - BCryptDestroyKey
+  - BCryptEncrypt
+  - BCryptFinishHash
+  - BCryptGenRandom
+  - BCryptGenerateSymmetricKey
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names:
+- \Device\IPSECDOSP
+- \Device\NXTIPSEC
+- \Device\TcpAllocHooks
+- \Device\WFP
+- \Device\WfpAle
+- \Device\eQoS
+symbolic_links:
+- \DosDevices\IPSECDOSPDevice
+- \DosDevices\NXTIPSECDevice
+- \DosDevices\WFPDev
+- \DosDevices\WfpAle
+registry_paths:
+- \Registry\Machine\Devices\Networking\Tcpip\
+- \Registry\Machine\SOFTWARE\Policies\Microsoft\Windows\QoS
+- \Registry\Machine\SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters\
+- \Registry\Machine\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters
+- \Registry\Machine\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\NsiObjectSecurity
+- \Registry\Machine\SYSTEM\CurrentControlSet\Services\Tcpip\QoS
+- \Registry\Machine\Software
+- \Registry\Machine\System\CurrentControlSet\Control\MiniNT
+- \Registry\Machine\System\CurrentControlSet\Services\BFE\Parameters
+- \Registry\Machine\System\CurrentControlSet\Services\BFE\Parameters\Policy\Options
+- \Registry\Machine\System\CurrentControlSet\Services\IPSEC
+sections:
+- name: .text
+  virtual_size: 1939372
+  raw_size: 1941504
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 207128
+  raw_size: 208896
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 100532
+  raw_size: 61440
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 87492
+  raw_size: 90112
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 34900
+  raw_size: 36864
+  characteristics: '0x48000040'
+- name: NONPAGE
+  virtual_size: 176
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: PAGE
+  virtual_size: 55834
+  raw_size: 57344
+  characteristics: '0x60000020'
+- name: PAGEIPSE
+  virtual_size: 115353
+  raw_size: 118784
+  characteristics: '0x60000020'
+- name: PAGEIDP
+  virtual_size: 11625
+  raw_size: 12288
+  characteristics: '0x60000020'
+- name: PAGERSS
+  virtual_size: 13819
+  raw_size: 16384
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: .edata
+  virtual_size: 50
+  raw_size: 4096
+  characteristics: '0x40000040'
+- name: PAGECONS
+  virtual_size: 312
+  raw_size: 4096
+  characteristics: '0x40000040'
+- name: INIT
+  virtual_size: 10336
+  raw_size: 12288
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 5456
+  raw_size: 8192
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 636312
+  raw_size: 638976
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 64876
+  raw_size: 65536
+  characteristics: '0x42000040'

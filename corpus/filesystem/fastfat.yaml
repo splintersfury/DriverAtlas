@@ -1,0 +1,167 @@
+name: fastfat
+filename: fastfat.sys
+category: filesystem
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:13.019851+00:00'
+sha256: 9fcbf76fb0b441ac245a354b05c5466caaf1fde6af2d9db77cc4518a38bc7d5e
+size: 456096
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: Fast FAT File System Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.5025 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.625
+secondary_frameworks: []
+import_count: 364
+api_categories:
+  irp_handling:
+  - IoAllocateIrp
+  - IoBuildAsynchronousFsdRequest
+  - IoBuildDeviceIoControlRequest
+  - IoBuildSynchronousFsdRequest
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  synchronization:
+  - ExAcquireFastMutex
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseFastMutex
+  - ExReleaseResourceLite
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeLeaveCriticalRegion
+  - KeReleaseSpinLock
+  - KeSetEvent
+  - KeWaitForSingleObject
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  timer_dpc:
+  - ExQueueWorkItem
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - IoQueueWorkItem
+  - KeCancelTimer
+  - KeDelayExecutionThread
+  - KeInitializeDpc
+  - KeInitializeTimer
+  - KeRemoveQueueDpc
+  - KeSetTimer
+  string_handling:
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitUnicodeString
+  security:
+  - IoIs32bitProcess
+  - ProbeForRead
+  - ProbeForWrite
+  - SeAccessCheck
+  - SePrivilegeCheck
+  - SeSinglePrivilegeCheck
+  device_mgmt:
+  - IoCreateDevice
+  - IoDeleteDevice
+  - IoGetDeviceObjectPointer
+  registry:
+  - ZwOpenKey
+  - ZwQueryValueKey
+  file_ops:
+  - ZwClose
+  - ZwOpenFile
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  etw_tracing:
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  - EtwWriteTransfer
+  process_thread:
+  - KeGetCurrentIrql
+  - PsCreateSystemThread
+  - PsTerminateSystemThread
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDecrypt
+  - BCryptDestroyHash
+  - BCryptDestroyKey
+  - BCryptEncrypt
+  - BCryptFinishHash
+  - BCryptGenRandom
+  - BCryptGenerateSymmetricKey
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names:
+- \Device\KsecDD
+symbolic_links: []
+registry_paths:
+- \Registry\Machine\Hardware\DESCRIPTION\System
+- \Registry\Machine\Software
+- \Registry\Machine\Software\Microsoft\Windows
+- \Registry\Machine\Software\Policies\Microsoft\Windows
+- \Registry\Machine\System\CurrentControlSet\Control\FileSystem
+- \Registry\Machine\System\CurrentControlSet\Services\NTFS\EFS\Parameters
+sections:
+- name: .text
+  virtual_size: 59136
+  raw_size: 61440
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 48104
+  raw_size: 49152
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 4204
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 10572
+  raw_size: 12288
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 15080
+  raw_size: 16384
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 260741
+  raw_size: 262144
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 3668
+  raw_size: 4096
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 452
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 7616
+  raw_size: 8192
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 13040
+  raw_size: 16384
+  characteristics: '0x42000040'

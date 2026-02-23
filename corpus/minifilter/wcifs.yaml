@@ -1,0 +1,118 @@
+name: wcifs
+filename: wcifs_patched_22621_2506.sys
+category: minifilter
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:08.989842+00:00'
+sha256: abb79c57efdda204a0a637d7af7966c69cae514faa3873596f83aad162f57362
+size: 251376
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: Windows Container Isolation FS Filter Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.3209 (WinBuild.160101.0800)
+framework: minifilter
+framework_confidence: 0.86
+secondary_frameworks: []
+import_count: 239
+api_categories:
+  registry:
+  - ZwOpenKey
+  - ZwQueryValueKey
+  irp_handling:
+  - IoBuildDeviceIoControlRequest
+  - IofCallDriver
+  etw_tracing:
+  - EtwRegister
+  - EtwUnregister
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  device_mgmt:
+  - IoGetDeviceObjectPointer
+  file_ops:
+  - FltCreateFileEx2
+  - FltReadFile
+  - FltWriteFile
+  - ZwClose
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  security:
+  - ExGetPreviousMode
+  - ProbeForRead
+  - ProbeForWrite
+  string_handling:
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitUnicodeString
+  synchronization:
+  - ExAcquireFastMutex
+  - ExReleaseFastMutex
+  - KeInitializeEvent
+  - KeSetEvent
+  - KeWaitForSingleObject
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  process_thread:
+  - KeGetCurrentIrql
+  timer_dpc:
+  - ExQueueWorkItem
+device_names:
+- \Device\cimfs
+- \Device\vmsmb
+symbolic_links: []
+registry_paths:
+- \Registry\Machine\System\CurrentControlSet\Control
+sections:
+- name: .text
+  virtual_size: 34386
+  raw_size: 36864
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 15984
+  raw_size: 16384
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 2208
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 4476
+  raw_size: 8192
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 10210
+  raw_size: 12288
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 127270
+  raw_size: 131072
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 6244
+  raw_size: 8192
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 292
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 3920
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 5940
+  raw_size: 8192
+  characteristics: '0x42000040'

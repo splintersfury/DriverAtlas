@@ -1,0 +1,150 @@
+name: appid
+filename: appid.sys
+category: minifilter
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:09.220754+00:00'
+sha256: 7c093eb0eeae4abb6abad3a78382d2cb089c2b7b83390eb162682f4b724807c6
+size: 247152
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: AppID Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.3139 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.875
+secondary_frameworks: []
+import_count: 218
+api_categories:
+  file_ops:
+  - ZwClose
+  - ZwCreateFile
+  - ZwOpenFile
+  - ZwQueryDirectoryFile
+  - ZwQueryInformationFile
+  - ZwReadFile
+  - ZwWriteFile
+  timer_dpc:
+  - KeDelayExecutionThread
+  string_handling:
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  synchronization:
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseResourceLite
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeLeaveCriticalRegion
+  - KeWaitForSingleObject
+  memory_management:
+  - ExAllocatePool2
+  - ExFreePoolWithTag
+  process_thread:
+  - KeGetCurrentIrql
+  - PsCreateSystemThread
+  - PsGetCurrentProcess
+  - PsGetCurrentProcessId
+  - PsLookupProcessByProcessId
+  - PsSetCreateProcessNotifyRoutineEx
+  etw_tracing:
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  device_mgmt:
+  - IoCreateDevice
+  - IoCreateSymbolicLink
+  - IoDeleteDevice
+  - IoDeleteSymbolicLink
+  registry:
+  - ZwCreateKey
+  - ZwEnumerateKey
+  - ZwOpenKey
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  security:
+  - SeAccessCheck
+  irp_handling:
+  - IofCompleteRequest
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDestroyHash
+  - BCryptFinishHash
+  - BCryptGenRandom
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names:
+- \Device\AppID
+- \Device\AppidEDPPlugin
+- \Device\SrpDevice
+symbolic_links: []
+registry_paths:
+- \REGISTRY\MACHINE\System\CurrentControlSet\Control\AppID\Configuration\EDP
+- \REGISTRY\MACHINE\System\CurrentControlSet\Control\AppID\Configuration\EDP\EdpLiveEnforcement
+- \REGISTRY\MACHINE\System\CurrentControlSet\Control\AppID\Configuration\SMARTLOCKER
+- \REGISTRY\MACHINE\System\CurrentControlSet\control\session
+- \Registry\Machine\Software\Microsoft\Windows\CurrentVersion
+- \Registry\Machine\System\CurrentControlSet\Control\AppID\
+- \Registry\Machine\System\CurrentControlSet\Control\AppID\CertStore\
+- \Registry\Machine\System\CurrentControlSet\Control\AppID\Configuration
+- \Registry\Machine\System\CurrentControlSet\Control\AppID\Configuration\EventSuppression
+- \Registry\Machine\System\CurrentControlSet\Control\Srp\GP\
+- \Registry\Machine\WindowsAppLockerCache
+sections:
+- name: .text
+  virtual_size: 22495
+  raw_size: 24576
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 61080
+  raw_size: 61440
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 2368
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 4596
+  raw_size: 8192
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 9112
+  raw_size: 12288
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 97545
+  raw_size: 98304
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 4036
+  raw_size: 4096
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 180
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 992
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 5340
+  raw_size: 8192
+  characteristics: '0x42000040'

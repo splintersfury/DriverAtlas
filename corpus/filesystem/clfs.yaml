@@ -1,0 +1,135 @@
+name: clfs
+filename: clfs.sys
+category: filesystem
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:13.212138+00:00'
+sha256: b138c28f72e8510f9612d07d5109d73065ced6cbbf8079a663a1e0601fe0fbaa
+size: 456136
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: Common Log File System Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.4580 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.75
+secondary_frameworks: []
+import_count: 192
+api_categories:
+  memory_management:
+  - ExAllocatePoolWithQuotaTag
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  string_handling:
+  - RtlAnsiStringToUnicodeString
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  etw_tracing:
+  - IoWMIRegistrationControl
+  device_mgmt:
+  - IoCreateDevice
+  - IoCreateSymbolicLink
+  - IoDeleteSymbolicLink
+  synchronization:
+  - ExAcquireFastMutex
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseFastMutex
+  - ExReleaseResourceLite
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeLeaveCriticalRegion
+  - KeReleaseSpinLock
+  - KeSetEvent
+  - KeWaitForSingleObject
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  file_ops:
+  - ZwClose
+  security:
+  - ExGetPreviousMode
+  - IoIs32bitProcess
+  - ProbeForRead
+  - ProbeForWrite
+  - SeAccessCheck
+  - SeFreePrivileges
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  irp_handling:
+  - IoAllocateIrp
+  - IoBuildAsynchronousFsdRequest
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  process_thread:
+  - KeGetCurrentIrql
+  timer_dpc:
+  - ExQueueWorkItem
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - IoQueueWorkItem
+  - KeDelayExecutionThread
+device_names: []
+symbolic_links:
+- \GLOBAL??\LOG
+registry_paths: []
+sections:
+- name: .text
+  virtual_size: 75776
+  raw_size: 77824
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 35584
+  raw_size: 36864
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 12138
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 17148
+  raw_size: 20480
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 7984
+  raw_size: 8192
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 256066
+  raw_size: 258048
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: .edata
+  virtual_size: 2136
+  raw_size: 4096
+  characteristics: '0x40000040'
+- name: INIT
+  virtual_size: 496
+  raw_size: 4096
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 1972
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 1496
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 12524
+  raw_size: 16384
+  characteristics: '0x42000040'

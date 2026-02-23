@@ -1,0 +1,159 @@
+name: cldflt
+filename: cldflt.sys
+category: minifilter
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:08.755240+00:00'
+sha256: fff42100bfe8870c3988f572d35c1f4d3f194a35e2e6673bdd26cbc5da78e828
+size: 569344
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: null
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: Cloud Files Mini Filter Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.3672 (WinBuild.160101.0800)
+framework: minifilter
+framework_confidence: 0.9
+secondary_frameworks:
+- wdm_raw
+import_count: 333
+api_categories:
+  string_handling:
+  - RtlAnsiStringToUnicodeString
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  - RtlUnicodeStringToAnsiString
+  etw_tracing:
+  - EtwRegister
+  - EtwUnregister
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  synchronization:
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseResourceLite
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeLeaveCriticalRegion
+  - KeReleaseSpinLock
+  - KeSetEvent
+  - KeWaitForSingleObject
+  file_ops:
+  - FltCreateFileEx2
+  - FltReadFile
+  - FltWriteFile
+  - ZwClose
+  - ZwCreateFile
+  - ZwQueryInformationFile
+  registry:
+  - ZwCreateKey
+  - ZwOpenKey
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  process_thread:
+  - KeGetCurrentIrql
+  - PsGetCurrentProcess
+  - PsGetCurrentProcessId
+  - PsLookupProcessByProcessId
+  security:
+  - ExGetPreviousMode
+  - ProbeForRead
+  - ProbeForWrite
+  - SeAccessCheck
+  - SePrivilegeCheck
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  device_mgmt:
+  - IoCreateDevice
+  - IoDeleteDevice
+  irp_handling:
+  - IofCompleteRequest
+  timer_dpc:
+  - ExQueueWorkItem
+  - KeCancelTimer
+  - KeInitializeDpc
+  - KeInitializeTimer
+  - KeRemoveQueueDpc
+  - KeSetTimer
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDestroyHash
+  - BCryptFinishHash
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names: []
+symbolic_links: []
+registry_paths:
+- \Registry\Machine\OSDATA\Software\Microsoft\
+- \Registry\Machine\System\CurrentControlSet\Services\
+- \Registry\Machine\System\WCOSJunctions
+sections:
+- name: .text
+  virtual_size: 115923
+  raw_size: 118784
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 29632
+  raw_size: 32768
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 6216
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 13812
+  raw_size: 16384
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 13794
+  raw_size: 16384
+  characteristics: '0x48000040'
+- name: NONPAGE
+  virtual_size: 176
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: PAGE
+  virtual_size: 337177
+  raw_size: 339968
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 3840
+  raw_size: 4096
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 536
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 1040
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 12480
+  raw_size: 16384
+  characteristics: '0x42000040'

@@ -1,0 +1,111 @@
+name: mskssrv
+filename: mskssrv.sys
+category: kernel_streaming
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:16.964691+00:00'
+sha256: d95c3452af624ab2b5462092629fb98a2f531853ba600e2dc707fb780b22b7d8
+size: 73728
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: null
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: MS KS Server
+company_name: Microsoft Corporation
+file_version: 10.0.22621.2050 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.75
+secondary_frameworks: []
+import_count: 68
+api_categories:
+  registry:
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  synchronization:
+  - KeInitializeMutex
+  - KeReleaseMutex
+  - KeSetEvent
+  - KeWaitForSingleObject
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObReferenceObjectByPointer
+  - ObfDereferenceObject
+  mdl_ops:
+  - IoAllocateMdl
+  - IoFreeMdl
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  memory_management:
+  - ExAllocatePoolWithTag
+  - ExFreePool
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  timer_dpc:
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - IoQueueWorkItem
+  file_ops:
+  - ZwClose
+  irp_handling:
+  - IofCompleteRequest
+  process_thread:
+  - PsGetCurrentProcessId
+  device_mgmt:
+  - IoAttachDeviceToDeviceStack
+  - IoCreateDevice
+  - IoDeleteDevice
+  string_handling:
+  - RtlInitUnicodeString
+device_names: []
+symbolic_links: []
+registry_paths: []
+sections:
+- name: .text
+  virtual_size: 7415
+  raw_size: 8192
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 3540
+  raw_size: 4096
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 320
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 1404
+  raw_size: 4096
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 2744
+  raw_size: 4096
+  characteristics: '0x48000040'
+- name: .guids
+  virtual_size: 48
+  raw_size: 4096
+  characteristics: '0x48000040'
+- name: PAGE
+  virtual_size: 16474
+  raw_size: 20480
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 350
+  raw_size: 4096
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 136
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 1000
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 1208
+  raw_size: 4096
+  characteristics: '0x42000040'

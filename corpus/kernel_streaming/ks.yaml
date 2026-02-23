@@ -1,0 +1,212 @@
+name: ks
+filename: ks.sys
+category: kernel_streaming
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:16.819958+00:00'
+sha256: 73a0489e6e73e90164017c0660f907235a6cd5a5b4d208ff7df294a737e21904
+size: 544768
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: null
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: Kernel CSA Library
+company_name: Microsoft Corporation
+file_version: 10.0.22621.3720 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.75
+secondary_frameworks: []
+import_count: 238
+api_categories:
+  registry:
+  - IoOpenDeviceRegistryKey
+  - RtlQueryRegistryValues
+  - RtlWriteRegistryValue
+  - ZwCreateKey
+  - ZwDeleteKey
+  - ZwDeleteValueKey
+  - ZwEnumerateKey
+  - ZwEnumerateValueKey
+  - ZwOpenKey
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  string_handling:
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  - RtlIntegerToUnicodeString
+  - RtlUnicodeStringToAnsiString
+  irp_handling:
+  - IoAllocateIrp
+  - IoBuildDeviceIoControlRequest
+  - IoBuildSynchronousFsdRequest
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  - PoCallDriver
+  security:
+  - ExGetPreviousMode
+  - ProbeForRead
+  - ProbeForWrite
+  - SeAccessCheck
+  - SeFreePrivileges
+  - SeSinglePrivilegeCheck
+  file_ops:
+  - ZwClose
+  timer_dpc:
+  - ExQueueWorkItem
+  - IoAllocateWorkItem
+  - IoFreeWorkItem
+  - IoQueueWorkItem
+  - KeCancelTimer
+  - KeInitializeDpc
+  - KeInitializeTimer
+  - KeInitializeTimerEx
+  - KeInsertQueueDpc
+  - KeRemoveQueueDpc
+  - KeSetTimer
+  - KeSetTimerEx
+  device_mgmt:
+  - IoAttachDeviceToDeviceStack
+  - IoCreateDevice
+  - IoDeleteDevice
+  - IoDetachDevice
+  - IoGetDeviceObjectPointer
+  - IoRegisterDeviceInterface
+  - IoSetDeviceInterfaceState
+  synchronization:
+  - ExAcquireFastMutex
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseFastMutex
+  - ExReleaseResourceLite
+  - KeAcquireSpinLockAtDpcLevel
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeInitializeMutex
+  - KeLeaveCriticalRegion
+  - KeReleaseMutex
+  - KeReleaseSpinLock
+  - KeReleaseSpinLockFromDpcLevel
+  - KeResetEvent
+  - KeSetEvent
+  - KeWaitForSingleObject
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePoolWithTag
+  - ExFreePool
+  - ExFreePoolWithTag
+  - MmAllocatePagesForMdl
+  - MmFreePagesFromMdl
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  power_pnp:
+  - IoInvalidateDeviceRelations
+  - PoRegisterPowerSettingCallback
+  - PoRequestPowerIrp
+  - PoSetPowerState
+  - PoStartNextPowerIrp
+  process_thread:
+  - KeGetCurrentIrql
+  - PsGetCurrentProcessId
+  - PsLookupProcessByProcessId
+  mdl_ops:
+  - IoAllocateMdl
+  - IoFreeMdl
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  etw_tracing:
+  - EtwRegister
+  - EtwWriteTransfer
+  - IoWMIRegistrationControl
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDestroyHash
+  - BCryptFinishHash
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names:
+- \Device\Capture
+- \Device\DxgKrnl
+- \Device\KSENUM
+- \Device\VerifierExt
+symbolic_links: []
+registry_paths:
+- \REGISTRY\MACHINE\SYSTEM\CurrentControlSet\Services
+- \Registry\Machine\SOFTWARE\Microsoft\OEM\Device\Capture
+- \Registry\Machine\SYSTEM\CurrentControlSet\Control\
+- \Registry\Machine\SYSTEM\CurrentControlSet\Control\DeviceClasses\
+- \Registry\Machine\SYSTEM\CurrentControlSet\Control\MediumCache
+- \Registry\Machine\SYSTEM\HardwareConfig\Current\ComputerIds
+sections:
+- name: .text
+  virtual_size: 105355
+  raw_size: 106496
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 45568
+  raw_size: 49152
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 1136
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 17532
+  raw_size: 20480
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 9682
+  raw_size: 12288
+  characteristics: '0x48000040'
+- name: .guids
+  virtual_size: 160
+  raw_size: 4096
+  characteristics: '0x48000040'
+- name: NONPAGE
+  virtual_size: 176
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: PAGE
+  virtual_size: 218157
+  raw_size: 221184
+  characteristics: '0x60000020'
+- name: PAGEKsVf
+  virtual_size: 59939
+  raw_size: 61440
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: .edata
+  virtual_size: 8363
+  raw_size: 12288
+  characteristics: '0x40000040'
+- name: PAGECONS
+  virtual_size: 7960
+  raw_size: 8192
+  characteristics: '0x40000040'
+- name: INIT
+  virtual_size: 688
+  raw_size: 4096
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 3768
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 5264
+  raw_size: 8192
+  characteristics: '0x42000040'
+- name: .reloc
+  virtual_size: 15388
+  raw_size: 16384
+  characteristics: '0x42000040'

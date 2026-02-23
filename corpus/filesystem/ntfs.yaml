@@ -1,0 +1,192 @@
+name: ntfs
+filename: ntfs.sys
+category: filesystem
+vendor: Microsoft
+source: WinBIndex
+scan_date: '2026-02-23T08:14:12.744541+00:00'
+sha256: dec2dfb73437e0d6392c20269e9a13c49041b9529ac35d4834285a4ef4e4391f
+size: 3315144
+machine: x64
+subsystem: native
+linker_version: '14.30'
+signer: Microsoft Windows
+product_name: "Microsoft\xAE Windows\xAE Operating System"
+file_description: NT File System Driver
+company_name: Microsoft Corporation
+file_version: 10.0.22621.4880 (WinBuild.160101.0800)
+framework: wdm_raw
+framework_confidence: 0.75
+secondary_frameworks: []
+import_count: 706
+api_categories:
+  string_handling:
+  - RtlAnsiStringToUnicodeString
+  - RtlCompareUnicodeString
+  - RtlCopyUnicodeString
+  - RtlEqualUnicodeString
+  - RtlFreeUnicodeString
+  - RtlInitAnsiString
+  - RtlInitUnicodeString
+  etw_tracing:
+  - EtwActivityIdControl
+  - EtwRegister
+  - EtwUnregister
+  - EtwWrite
+  - EtwWriteTransfer
+  irp_handling:
+  - IoAllocateIrp
+  - IoBuildAsynchronousFsdRequest
+  - IoBuildDeviceIoControlRequest
+  - IoBuildSynchronousFsdRequest
+  - IoFreeIrp
+  - IofCallDriver
+  - IofCompleteRequest
+  synchronization:
+  - ExAcquireFastMutex
+  - ExAcquireResourceExclusiveLite
+  - ExAcquireResourceSharedLite
+  - ExReleaseFastMutex
+  - ExReleaseResourceLite
+  - KeAcquireInStackQueuedSpinLock
+  - KeEnterCriticalRegion
+  - KeInitializeEvent
+  - KeInitializeMutex
+  - KeLeaveCriticalRegion
+  - KeReleaseInStackQueuedSpinLock
+  - KeReleaseMutex
+  - KeReleaseSpinLock
+  - KeResetEvent
+  - KeSetEvent
+  - KeWaitForSingleObject
+  object_mgmt:
+  - ObReferenceObjectByHandle
+  - ObfDereferenceObject
+  registry:
+  - ZwOpenKey
+  - ZwQueryValueKey
+  - ZwSetValueKey
+  file_ops:
+  - ZwClose
+  - ZwOpenFile
+  - ZwQueryDirectoryFile
+  - ZwSetInformationFile
+  dma:
+  - MmMapIoSpaceEx
+  - MmUnmapIoSpace
+  timer_dpc:
+  - ExQueueWorkItem
+  - KeCancelTimer
+  - KeDelayExecutionThread
+  - KeInitializeDpc
+  - KeInitializeTimer
+  security:
+  - ExGetPreviousMode
+  - IoCheckEaBufferValidity
+  - IoIs32bitProcess
+  - ProbeForRead
+  - ProbeForWrite
+  - SeAccessCheck
+  - SeFreePrivileges
+  - SePrivilegeCheck
+  process_thread:
+  - KeGetCurrentIrql
+  - PsCreateSystemThread
+  - PsGetCurrentProcessId
+  - PsLookupProcessByProcessId
+  - PsTerminateSystemThread
+  mdl_ops:
+  - IoAllocateMdl
+  - IoBuildPartialMdl
+  - IoFreeMdl
+  - MmBuildMdlForNonPagedPool
+  - MmProbeAndLockPages
+  - MmUnlockPages
+  memory_management:
+  - ExAllocatePool2
+  - ExAllocatePoolWithTag
+  - ExFreePoolWithTag
+  - MmMapLockedPagesSpecifyCache
+  - MmUnmapLockedPages
+  power_pnp:
+  - IoRegisterPlugPlayNotification
+  device_mgmt:
+  - IoCreateDevice
+  - IoCreateSymbolicLink
+  - IoDeleteDevice
+  - IoGetDeviceObjectPointer
+  crypto:
+  - BCryptCloseAlgorithmProvider
+  - BCryptCreateHash
+  - BCryptDecrypt
+  - BCryptDestroyHash
+  - BCryptDestroyKey
+  - BCryptEncrypt
+  - BCryptFinishHash
+  - BCryptGenRandom
+  - BCryptGenerateSymmetricKey
+  - BCryptHashData
+  - BCryptOpenAlgorithmProvider
+device_names:
+- \Device\KsecDD
+symbolic_links:
+- \DosDevices\Ntfs
+registry_paths:
+- \Registry\Machine\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock
+- \Registry\Machine\Software
+- \Registry\Machine\Software\Microsoft\Windows
+- \Registry\Machine\Software\Policies\Microsoft\Windows
+- \Registry\Machine\System\CurrentControlSet\Control\FileSystem
+- \Registry\Machine\System\CurrentControlSet\Control\MiniNT
+- \Registry\Machine\System\CurrentControlSet\Control\UpdateOS
+- \Registry\Machine\System\CurrentControlSet\Policies
+- \Registry\Machine\System\CurrentControlSet\Services\
+- \Registry\Machine\System\CurrentControlSet\Services\NTFS\EFS\Parameters
+sections:
+- name: .text
+  virtual_size: 464991
+  raw_size: 466944
+  characteristics: '0x68000020'
+- name: .rdata
+  virtual_size: 203848
+  raw_size: 204800
+  characteristics: '0x48000040'
+- name: .data
+  virtual_size: 33222
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: .pdata
+  virtual_size: 61464
+  raw_size: 65536
+  characteristics: '0x48000040'
+- name: .idata
+  virtual_size: 29822
+  raw_size: 32768
+  characteristics: '0x48000040'
+- name: NONPAGE
+  virtual_size: 176
+  raw_size: 4096
+  characteristics: '0xC8000040'
+- name: PAGE
+  virtual_size: 2004209
+  raw_size: 2007040
+  characteristics: '0x60000020'
+- name: fothk
+  virtual_size: 4096
+  raw_size: 4096
+  characteristics: '0x60000020'
+- name: INIT
+  virtual_size: 14964
+  raw_size: 16384
+  characteristics: '0x62000020'
+- name: GFIDS
+  virtual_size: 1228
+  raw_size: 4096
+  characteristics: '0x42000040'
+- name: .rsrc
+  virtual_size: 434072
+  raw_size: 434176
+  characteristics: '0x40000040'
+- name: .reloc
+  virtual_size: 57260
+  raw_size: 57344
+  characteristics: '0x42000040'
