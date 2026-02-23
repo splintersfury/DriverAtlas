@@ -1,0 +1,193 @@
+# Framework detection rules for DriverAtlas
+# Each framework defines anchor imports (high weight) and supporting imports (lower weight).
+# Score = sum of matched weights. Confidence = matched_weight / total_weight.
+
+frameworks:
+
+  minifilter:
+    description: Filesystem minifilter driver (FltMgr-based)
+    anchors:
+      dll: fltmgr.sys
+      symbols:
+        - FltRegisterFilter
+        - FltStartFiltering
+        - FltUnregisterFilter
+      weight: 5.0
+    supporting:
+      - {dll: fltmgr.sys, symbol: FltGetStreamContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltGetStreamHandleContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltGetInstanceContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltGetVolumeContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltReleaseContext, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltAllocateContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltSetStreamContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltSetStreamHandleContext, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltCreateFileEx2, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltCreateFile, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltSendMessage, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltCreateCommunicationPort, weight: 1.5}
+      - {dll: fltmgr.sys, symbol: FltCloseCommunicationPort, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltGetFileNameInformation, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltReleaseFileNameInformation, weight: 1.0}
+      - {dll: fltmgr.sys, symbol: FltParseFileNameInformation, weight: 1.0}
+
+  ndis_miniport:
+    description: NDIS miniport (NIC) driver
+    anchors:
+      dll: ndis.sys
+      symbols:
+        - NdisMRegisterMiniportDriver
+        - NdisMDeregisterMiniportDriver
+      weight: 5.0
+    supporting:
+      - {dll: ndis.sys, symbol: NdisMSetMiniportAttributes, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisMIndicateReceiveNetBufferLists, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisMSendNetBufferListsComplete, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisMOidRequestComplete, weight: 1.5}
+      - {dll: ndis.sys, symbol: NdisAllocateNetBufferListPool, weight: 1.5}
+      - {dll: ndis.sys, symbol: NdisFreeNetBufferListPool, weight: 1.0}
+      - {dll: ndis.sys, symbol: NdisMRegisterInterruptEx, weight: 1.5}
+
+  ndis_filter:
+    description: NDIS lightweight filter driver
+    anchors:
+      dll: ndis.sys
+      symbols:
+        - NdisFRegisterFilterDriver
+        - NdisFDeregisterFilterDriver
+      weight: 5.0
+    supporting:
+      - {dll: ndis.sys, symbol: NdisFSetAttributes, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisFIndicateReceiveNetBufferLists, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisFSendNetBufferLists, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisFSendNetBufferListsComplete, weight: 1.5}
+      - {dll: ndis.sys, symbol: NdisFOidRequest, weight: 1.5}
+      - {dll: ndis.sys, symbol: NdisFOidRequestComplete, weight: 1.5}
+
+  ndis_protocol:
+    description: NDIS protocol driver
+    anchors:
+      dll: ndis.sys
+      symbols:
+        - NdisRegisterProtocolDriver
+        - NdisDeregisterProtocolDriver
+      weight: 5.0
+    supporting:
+      - {dll: ndis.sys, symbol: NdisOpenAdapterEx, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisCloseAdapterEx, weight: 2.0}
+      - {dll: ndis.sys, symbol: NdisSendNetBufferLists, weight: 1.5}
+      - {dll: ndis.sys, symbol: NdisOidRequest, weight: 1.5}
+
+  wfp_callout:
+    description: Windows Filtering Platform callout driver
+    anchors:
+      dll: fwpkclnt.sys
+      symbols:
+        - FwpsCalloutRegister0
+        - FwpsCalloutRegister1
+        - FwpsCalloutRegister2
+        - FwpsCalloutRegister3
+      weight: 5.0
+    supporting:
+      - {dll: fwpkclnt.sys, symbol: FwpmFilterAdd0, weight: 2.0}
+      - {dll: fwpkclnt.sys, symbol: FwpmSubLayerAdd0, weight: 2.0}
+      - {dll: fwpkclnt.sys, symbol: FwpmEngineOpen0, weight: 2.0}
+      - {dll: fwpkclnt.sys, symbol: FwpmEngineClose0, weight: 1.5}
+      - {dll: fwpkclnt.sys, symbol: FwpmTransactionBegin0, weight: 1.5}
+      - {dll: fwpkclnt.sys, symbol: FwpmTransactionCommit0, weight: 1.5}
+      - {dll: fwpkclnt.sys, symbol: FwpsCompleteClassify0, weight: 1.5}
+      - {dll: fwpkclnt.sys, symbol: FwpsAcquireClassifyHandle0, weight: 1.5}
+      - {dll: fwpkclnt.sys, symbol: FwpsReleaseClassifyHandle0, weight: 1.0}
+      - {dll: fwpkclnt.sys, symbol: FwpsFlowAssociateContext0, weight: 1.0}
+
+  kmdf:
+    description: Kernel-Mode Driver Framework (KMDF) driver
+    anchors:
+      dll: wdfldr.sys
+      symbols:
+        - WdfVersionBind
+        - WdfVersionUnbind
+      weight: 5.0
+    supporting:
+      - {dll: ntoskrnl.exe, symbol: WdfDriverCreate, weight: 2.0}
+      - {dll: ntoskrnl.exe, symbol: WdfDeviceCreate, weight: 2.0}
+      - {dll: ntoskrnl.exe, symbol: WdfRequestRetrieveInputBuffer, weight: 1.5}
+      - {dll: ntoskrnl.exe, symbol: WdfRequestRetrieveOutputBuffer, weight: 1.5}
+      - {dll: ntoskrnl.exe, symbol: WdfRequestComplete, weight: 1.5}
+      - {dll: ntoskrnl.exe, symbol: WdfIoQueueCreate, weight: 1.5}
+      - {dll: ntoskrnl.exe, symbol: WdfObjectDelete, weight: 1.0}
+      - {dll: ntoskrnl.exe, symbol: WdfSpinLockCreate, weight: 1.0}
+
+  storport:
+    description: StorPort miniport driver (storage)
+    anchors:
+      dll: storport.sys
+      symbols:
+        - StorPortInitialize
+      weight: 5.0
+    supporting:
+      - {dll: storport.sys, symbol: StorPortCompleteRequest, weight: 2.0}
+      - {dll: storport.sys, symbol: StorPortGetDeviceBase, weight: 1.5}
+      - {dll: storport.sys, symbol: StorPortNotification, weight: 1.5}
+      - {dll: storport.sys, symbol: StorPortAllocatePool, weight: 1.0}
+      - {dll: storport.sys, symbol: StorPortFreePool, weight: 1.0}
+      - {dll: storport.sys, symbol: StorPortGetScatterGatherList, weight: 1.5}
+      - {dll: storport.sys, symbol: StorPortSynchronizeAccess, weight: 1.0}
+
+  portclass_audio:
+    description: PortClass audio miniport driver
+    anchors:
+      dll: portcls.sys
+      symbols:
+        - PcRegisterSubdevice
+        - PcInitializeAdapterDriver
+      weight: 5.0
+    supporting:
+      - {dll: portcls.sys, symbol: PcNewPort, weight: 2.0}
+      - {dll: portcls.sys, symbol: PcNewMiniport, weight: 2.0}
+      - {dll: portcls.sys, symbol: PcRegisterPhysicalConnection, weight: 1.5}
+      - {dll: portcls.sys, symbol: PcAddAdapterDevice, weight: 1.5}
+      - {dll: portcls.sys, symbol: PcNewResourceList, weight: 1.0}
+
+  ks_minidriver:
+    description: Kernel Streaming minidriver (camera, capture)
+    anchors:
+      dll: ks.sys
+      symbols:
+        - KsInitializeDriver
+        - KsCreateFilterFactory
+      weight: 5.0
+    supporting:
+      - {dll: ks.sys, symbol: KsCreatePin, weight: 2.0}
+      - {dll: ks.sys, symbol: KsAddItemToObjectBag, weight: 1.5}
+      - {dll: ks.sys, symbol: KsFilterRegisterPowerCallbacks, weight: 1.5}
+      - {dll: ks.sys, symbol: KsPinGetLeadingEdgeStreamPointer, weight: 1.5}
+      - {dll: ks.sys, symbol: KsStreamPointerAdvance, weight: 1.0}
+
+  class_video:
+    description: Video class minidriver (display)
+    anchors:
+      dll: videoprt.sys
+      symbols:
+        - VideoPortInitialize
+      weight: 5.0
+    supporting:
+      - {dll: videoprt.sys, symbol: VideoPortGetDeviceBase, weight: 2.0}
+      - {dll: videoprt.sys, symbol: VideoPortMapMemory, weight: 1.5}
+      - {dll: videoprt.sys, symbol: VideoPortSetRegistryParameters, weight: 1.0}
+      - {dll: videoprt.sys, symbol: VideoPortAllocatePool, weight: 1.0}
+
+  wdm_raw:
+    description: Raw WDM driver (no class framework detected)
+    is_fallback: true
+    anchors:
+      dll: ntoskrnl.exe
+      symbols:
+        - IoCreateDevice
+      weight: 3.0
+    supporting:
+      - {dll: ntoskrnl.exe, symbol: IoDeleteDevice, weight: 1.0}
+      - {dll: ntoskrnl.exe, symbol: IoCreateSymbolicLink, weight: 1.0}
+      - {dll: ntoskrnl.exe, symbol: IoDeleteSymbolicLink, weight: 1.0}
+      - {dll: ntoskrnl.exe, symbol: IofCompleteRequest, weight: 1.0}
+      - {dll: ntoskrnl.exe, symbol: IoAttachDeviceToDeviceStack, weight: 1.0}
