@@ -1,8 +1,10 @@
 """DriverAtlas CLI — scan, import, and manage driver corpus."""
 
 import json
+import logging
 import os
 import sys
+import time
 
 import click
 import yaml
@@ -11,6 +13,7 @@ from rich.table import Table
 
 from .scanner import scan_driver
 from .framework_detect import FrameworkClassifier
+from .scoring import AttackSurfaceScorer
 from .corpus import Corpus
 
 console = Console()
@@ -20,6 +23,7 @@ _PKG_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _FRAMEWORKS_PATH = os.path.join(_PKG_ROOT, "signatures", "frameworks.yaml")
 _CATEGORIES_PATH = os.path.join(_PKG_ROOT, "signatures", "api_categories.yaml")
 _CORPUS_DIR = os.path.join(_PKG_ROOT, "corpus")
+_ATTACK_SURFACE_PATH = os.path.join(_PKG_ROOT, "signatures", "attack_surface.yaml")
 
 
 def _get_classifier():
@@ -91,6 +95,121 @@ def scan(path, recursive, fmt, output):
             _write_output(output, text)
         else:
             console.print(text)
+
+
+@main.command()
+@click.argument("path")
+@click.option("-r", "--recursive", is_flag=True, help="Scan directory recursively for .sys files")
+@click.option("-f", "--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+@click.option("--min-score", type=float, default=0.0, help="Only show drivers with score >= this value")
+@click.option("-o", "--output", type=click.Path(), help="Write output to file")
+def rank(path, recursive, fmt, min_score, output):
+    """Rank drivers by attack surface score."""
+    classifier = _get_classifier()
+    cats_path = _CATEGORIES_PATH if os.path.exists(_CATEGORIES_PATH) else None
+    scorer = AttackSurfaceScorer(_ATTACK_SURFACE_PATH)
+
+    targets = []
+    if os.path.isfile(path):
+        targets.append(path)
+    elif os.path.isdir(path):
+        if recursive:
+            for root, _dirs, files in os.walk(path):
+                targets.extend(
+                    os.path.join(root, f) for f in files if f.lower().endswith(".sys")
+                )
+        else:
+            targets.extend(
+                os.path.join(path, f) for f in os.listdir(path) if f.lower().endswith(".sys")
+            )
+    else:
+        console.print(f"[red]Path not found:[/] {path}")
+        sys.exit(1)
+
+    if not targets:
+        console.print("[yellow]No .sys files found.[/]")
+        return
+
+    results = []
+    for t in sorted(targets):
+        try:
+            profile = scan_driver(t, classifier=classifier, categories_path=cats_path)
+            score = scorer.score(profile)
+            if score.total >= min_score:
+                results.append((profile, score))
+        except Exception as e:
+            console.print(f"[red]Error scanning {t}:[/] {e}")
+
+    # Sort by score descending
+    results.sort(key=lambda x: x[1].total, reverse=True)
+
+    if not results:
+        console.print("[yellow]No drivers matched the criteria.[/]")
+        return
+
+    if fmt == "json":
+        data = []
+        for profile, score in results:
+            entry = profile.to_dict()
+            entry["attack_surface"] = score.to_dict()
+            data.append(entry)
+        text = json.dumps(data, indent=2, default=str)
+        if output:
+            _write_output(output, text)
+        else:
+            console.print(text)
+    else:
+        _print_rank_table(results)
+
+
+def _print_rank_table(results):
+    """Print a color-coded ranking table."""
+    table = Table(title="DriverAtlas Attack Surface Ranking", show_lines=True)
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Driver", style="cyan", no_wrap=True)
+    table.add_column("Score", justify="right", width=7)
+    table.add_column("Risk", width=10)
+    table.add_column("Framework", style="green")
+    table.add_column("Size")
+    table.add_column("Imports", justify="right")
+    table.add_column("Signer")
+    table.add_column("Key Flags")
+
+    for i, (profile, score) in enumerate(results, 1):
+        # Color-code score
+        if score.total >= 8.0:
+            score_str = f"[bold red]{score.total:.1f}[/]"
+            risk_str = f"[bold red]{score.risk_level}[/]"
+        elif score.total >= 5.0:
+            score_str = f"[yellow]{score.total:.1f}[/]"
+            risk_str = f"[yellow]{score.risk_level}[/]"
+        else:
+            score_str = f"[green]{score.total:.1f}[/]"
+            risk_str = f"[green]{score.risk_level}[/]"
+
+        signer = profile.signer or "-"
+        if len(signer) > 25:
+            signer = signer[:22] + "..."
+
+        # Show top 3 flags
+        top_flags = score.flags[:3]
+        flags_str = "; ".join(f[:40] for f in top_flags)
+        if len(score.flags) > 3:
+            flags_str += f" (+{len(score.flags) - 3})"
+
+        table.add_row(
+            str(i),
+            profile.name,
+            score_str,
+            risk_str,
+            profile.framework,
+            f"{profile.size:,}",
+            str(profile.import_count),
+            signer,
+            flags_str,
+        )
+
+    console.print(table)
 
 
 def _print_table(profiles):
@@ -205,6 +324,81 @@ def import_cmd(path, category, vendor, display_name, source):
     console.print(f"[green]Imported {profile.name} → {out_path}[/]")
     console.print(f"  Framework: {profile.framework} ({profile.framework_confidence:.0%})")
     console.print(f"  Imports: {profile.import_count}")
+
+
+@main.command()
+@click.option("--vt-key", envvar="VT_API_KEY", help="VirusTotal API key (or set VT_API_KEY)")
+@click.option("--interval", type=int, default=0, help="Re-run interval in seconds (0 = run once)")
+@click.option("--min-score", type=float, default=6.0, help="Minimum score to report")
+@click.option("--limit", type=int, default=50, help="Max VT results per query")
+@click.option("--telegram-token", envvar="TELEGRAM_BOT_TOKEN", help="Telegram bot token")
+@click.option("--telegram-chat", envvar="TELEGRAM_CHAT_ID", help="Telegram chat ID")
+@click.option("--import-to-corpus", is_flag=True, help="Import high-scoring drivers to corpus")
+@click.option("-d", "--directory", type=click.Path(exists=True), help="Scan local directory instead of VT")
+def hunt(vt_key, interval, min_score, limit, telegram_token, telegram_chat, import_to_corpus, directory):
+    """Hunt for vulnerable drivers (VT Intelligence or local directory)."""
+    from .hunter import DriverHunter
+
+    hunter = DriverHunter()
+
+    def _run_once():
+        if directory:
+            console.print(f"[cyan]Hunting in directory:[/] {directory}")
+            results = hunter.hunt_directory(directory, recursive=True, min_score=min_score)
+        else:
+            if not vt_key:
+                console.print("[red]VT_API_KEY required for VT hunting. Use --vt-key or set VT_API_KEY.[/]")
+                sys.exit(1)
+            os.environ["VT_API_KEY"] = vt_key
+            console.print(f"[cyan]Hunting on VirusTotal[/] (limit={limit}, min_score={min_score})")
+            results = hunter.hunt_vt(limit=limit, min_score=min_score)
+
+        if not results:
+            console.print("[yellow]No findings above threshold.[/]")
+            return
+
+        # Print results table
+        table = Table(title=f"Hunt Results ({len(results)} drivers)", show_lines=True)
+        table.add_column("#", style="dim", width=4)
+        table.add_column("Driver", style="cyan")
+        table.add_column("Score", justify="right", width=7)
+        table.add_column("Risk", width=10)
+        table.add_column("SHA256")
+        table.add_column("Source")
+
+        for i, r in enumerate(results, 1):
+            if r.score.total >= 8.0:
+                score_str = f"[bold red]{r.score.total:.1f}[/]"
+                risk_str = f"[bold red]{r.score.risk_level}[/]"
+            elif r.score.total >= 5.0:
+                score_str = f"[yellow]{r.score.total:.1f}[/]"
+                risk_str = f"[yellow]{r.score.risk_level}[/]"
+            else:
+                score_str = f"[green]{r.score.total:.1f}[/]"
+                risk_str = f"[green]{r.score.risk_level}[/]"
+
+            table.add_row(str(i), r.name, score_str, risk_str, r.sha256[:16] + "...", r.source)
+
+        console.print(table)
+
+        # Telegram alert
+        if telegram_token and telegram_chat:
+            sent = hunter.alert_telegram(results, telegram_token, telegram_chat, min_score=8.0)
+            if sent:
+                console.print("[green]Telegram alert sent.[/]")
+
+    if interval > 0:
+        console.print(f"[cyan]Running as daemon (interval={interval}s)[/]")
+        while True:
+            try:
+                _run_once()
+                console.print(f"[dim]Sleeping {interval}s...[/]")
+                time.sleep(interval)
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Stopped.[/]")
+                break
+    else:
+        _run_once()
 
 
 @main.command()

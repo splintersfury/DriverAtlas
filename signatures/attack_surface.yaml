@@ -1,0 +1,157 @@
+# Attack surface scoring rules for DriverAtlas
+# Each rule has a check type, parameters, weight, and description.
+# Score = sum of matched rule weights, clamped to [0.0, 15.0].
+#
+# Risk levels:
+#   critical: 10.0+
+#   high:     8.0 - 10.0
+#   medium:   5.0 - 8.0
+#   low:      2.0 - 5.0
+#   minimal:  0.0 - 2.0
+
+version: 1
+
+clamp:
+  min: 0.0
+  max: 15.0
+
+risk_levels:
+  - {name: critical, min: 10.0}
+  - {name: high, min: 8.0}
+  - {name: medium, min: 5.0}
+  - {name: low, min: 2.0}
+  - {name: minimal, min: 0.0}
+
+rules:
+
+  # ── Positive signals (increase attack surface score) ──────────────
+
+  - id: device_name_exposed
+    description: Device name exposed (usermode-accessible path)
+    check: has_device_names
+    weight: 3.0
+
+  - id: symbolic_link_present
+    description: Symbolic link present (DosDevices/Global??)
+    check: has_symbolic_links
+    weight: 2.0
+
+  - id: ioctl_strings_present
+    description: IOCTL_ strings present in binary
+    check: has_ioctl_strings
+    weight: 2.0
+
+  - id: mmmapiospace_import
+    description: MmMapIoSpace / MmMapIoSpaceEx — physical memory mapping
+    check: has_import
+    params: [MmMapIoSpace, MmMapIoSpaceEx]
+    weight: 4.0
+
+  - id: register_port_io
+    description: READ/WRITE_REGISTER_ULONG or port I/O
+    check: has_import
+    params: [READ_REGISTER_ULONG, WRITE_REGISTER_ULONG, READ_PORT_UCHAR, WRITE_PORT_UCHAR, READ_PORT_USHORT, WRITE_PORT_USHORT, READ_PORT_ULONG, WRITE_PORT_ULONG]
+    weight: 3.0
+
+  - id: dma_operations
+    description: DMA operations (AllocateCommonBuffer, etc.)
+    check: has_import
+    params: [AllocateCommonBuffer, FreeCommonBuffer, MapTransfer, GetDmaAdapter]
+    weight: 2.0
+
+  - id: no_probe_functions
+    description: No ProbeForRead/ProbeForWrite — missing input validation
+    check: missing_all_imports
+    params: [ProbeForRead, ProbeForWrite]
+    weight: 2.5
+
+  - id: no_access_checks
+    description: No SeAccessCheck/SeSinglePrivilegeCheck — missing authorization
+    check: missing_all_imports
+    params: [SeAccessCheck, SeSinglePrivilegeCheck]
+    weight: 1.5
+
+  - id: insecure_device_creation
+    description: IoCreateDevice without IoCreateDeviceSecure
+    check: has_import_without
+    params:
+      required: IoCreateDevice
+      excluded: IoCreateDeviceSecure
+    weight: 2.0
+
+  - id: deprecated_pool_alloc
+    description: Deprecated ExAllocatePool (no tag)
+    check: has_import
+    params: [ExAllocatePool]
+    weight: 1.0
+
+  - id: small_driver
+    description: Small driver (<100KB) — limited complexity, likely single-purpose
+    check: size_below
+    params: 102400
+    weight: 1.0
+
+  - id: low_import_count
+    description: Low import count (<50) — minimal framework usage
+    check: import_count_below
+    params: 50
+    weight: 1.0
+
+  - id: wdm_raw_framework
+    description: Raw WDM framework — no class driver safety net
+    check: framework_equals
+    params: wdm_raw
+    weight: 1.0
+
+  - id: third_party_signer
+    description: Third-party signer — less review than Microsoft drivers
+    check: signer_not_microsoft
+    weight: 0.5
+
+  # ── Negative signals (reduce attack surface score) ────────────────
+
+  - id: has_probe_functions
+    description: Has ProbeForRead AND ProbeForWrite — proper input validation
+    check: has_all_imports
+    params: [ProbeForRead, ProbeForWrite]
+    weight: -2.0
+
+  - id: has_access_check
+    description: Has SeAccessCheck — enforces authorization
+    check: has_import
+    params: [SeAccessCheck]
+    weight: -1.5
+
+  - id: secure_device_creation
+    description: IoCreateDeviceSecure present — proper device ACLs
+    check: has_import
+    params: [IoCreateDeviceSecure]
+    weight: -2.0
+
+  - id: kmdf_framework
+    description: KMDF framework — built-in safety mechanisms
+    check: framework_equals
+    params: kmdf
+    weight: -1.0
+
+  - id: minifilter_framework
+    description: Minifilter framework — structured, less direct hardware access
+    check: framework_equals
+    params: minifilter
+    weight: -1.0
+
+  - id: large_import_count
+    description: Large import count (>300) — complex driver with broad API usage
+    check: import_count_above
+    params: 300
+    weight: -1.0
+
+  - id: microsoft_signer
+    description: Microsoft signer — higher review standards
+    check: signer_is_microsoft
+    weight: -1.0
+
+  - id: no_device_names
+    description: No device names found — likely not directly usermode-accessible
+    check: no_device_names
+    weight: -3.0
