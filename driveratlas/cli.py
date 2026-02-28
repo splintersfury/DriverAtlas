@@ -25,12 +25,36 @@ _CATEGORIES_PATH = os.path.join(_PKG_ROOT, "signatures", "api_categories.yaml")
 _CORPUS_DIR = os.path.join(_PKG_ROOT, "corpus")
 _ATTACK_SURFACE_PATH = os.path.join(_PKG_ROOT, "signatures", "attack_surface.yaml")
 
+_blocklist_singleton = None
+
 
 def _get_classifier():
     if os.path.exists(_FRAMEWORKS_PATH):
         return FrameworkClassifier(_FRAMEWORKS_PATH)
     console.print("[yellow]Warning: frameworks.yaml not found, framework detection disabled[/]")
     return None
+
+
+def _get_blocklist(no_blocklist=False):
+    """Lazy-init blocklist checker. Returns None if disabled or unavailable."""
+    global _blocklist_singleton
+    if no_blocklist:
+        return None
+    if _blocklist_singleton is not None:
+        return _blocklist_singleton
+    try:
+        from .blocklist import BlocklistChecker
+        checker = BlocklistChecker()
+        checker.load()
+        s = checker.stats
+        console.print(
+            f"[dim]Blocklist loaded: {s['loldrivers']} LOLDrivers, {s['wdac']} WDAC hashes[/]"
+        )
+        _blocklist_singleton = checker
+        return checker
+    except Exception as e:
+        console.print(f"[yellow]Blocklist unavailable: {e}[/]")
+        return None
 
 
 @click.group()
@@ -44,7 +68,8 @@ def main():
 @click.option("-r", "--recursive", is_flag=True, help="Scan directory recursively for .sys files")
 @click.option("-f", "--format", "fmt", type=click.Choice(["table", "yaml", "json"]), default="table")
 @click.option("-o", "--output", type=click.Path(), help="Write output to file")
-def scan(path, recursive, fmt, output):
+@click.option("--no-blocklist", is_flag=True, help="Skip blocklist lookup")
+def scan(path, recursive, fmt, output, no_blocklist):
     """Scan a driver (.sys) or directory of drivers."""
     classifier = _get_classifier()
     cats_path = _CATEGORIES_PATH if os.path.exists(_CATEGORIES_PATH) else None
@@ -81,16 +106,34 @@ def scan(path, recursive, fmt, output):
     if not profiles:
         return
 
+    # Blocklist lookup
+    checker = _get_blocklist(no_blocklist)
+    bl_matches = {}
+    if checker:
+        bl_matches = checker.lookup_many([p.sha256 for p in profiles])
+
     if fmt == "table":
-        _print_table(profiles)
+        _print_table(profiles, bl_matches)
     elif fmt == "yaml":
-        text = yaml.dump([p.to_dict() for p in profiles], default_flow_style=False, sort_keys=False)
+        data = []
+        for p in profiles:
+            entry = p.to_dict()
+            if p.sha256 in bl_matches:
+                entry["blocklist"] = bl_matches[p.sha256].to_dict()
+            data.append(entry)
+        text = yaml.dump(data, default_flow_style=False, sort_keys=False)
         if output:
             _write_output(output, text)
         else:
             console.print(text)
     elif fmt == "json":
-        text = json.dumps([p.to_dict() for p in profiles], indent=2, default=str)
+        data = []
+        for p in profiles:
+            entry = p.to_dict()
+            if p.sha256 in bl_matches:
+                entry["blocklist"] = bl_matches[p.sha256].to_dict()
+            data.append(entry)
+        text = json.dumps(data, indent=2, default=str)
         if output:
             _write_output(output, text)
         else:
@@ -135,7 +178,8 @@ def _profile_from_yaml(path: str) -> DriverProfile:
 @click.option("-f", "--format", "fmt", type=click.Choice(["table", "json"]), default="table")
 @click.option("--min-score", type=float, default=0.0, help="Only show drivers with score >= this value")
 @click.option("-o", "--output", type=click.Path(), help="Write output to file")
-def rank(path, recursive, fmt, min_score, output):
+@click.option("--no-blocklist", is_flag=True, help="Skip blocklist lookup")
+def rank(path, recursive, fmt, min_score, output, no_blocklist):
     """Rank drivers by attack surface score.
 
     Accepts .sys binaries (scanned live) or .yaml corpus entries.
@@ -186,11 +230,19 @@ def rank(path, recursive, fmt, min_score, output):
         console.print("[yellow]No drivers matched the criteria.[/]")
         return
 
+    # Blocklist lookup
+    checker = _get_blocklist(no_blocklist)
+    bl_matches = {}
+    if checker:
+        bl_matches = checker.lookup_many([p.sha256 for p, _ in results])
+
     if fmt == "json":
         data = []
         for profile, score in results:
             entry = profile.to_dict()
             entry["attack_surface"] = score.to_dict()
+            if profile.sha256 in bl_matches:
+                entry["blocklist"] = bl_matches[profile.sha256].to_dict()
             data.append(entry)
         text = json.dumps(data, indent=2, default=str)
         if output:
@@ -198,16 +250,21 @@ def rank(path, recursive, fmt, min_score, output):
         else:
             console.print(text)
     else:
-        _print_rank_table(results)
+        _print_rank_table(results, bl_matches)
 
 
-def _print_rank_table(results):
+def _print_rank_table(results, bl_matches=None):
     """Print a color-coded ranking table."""
+    bl_matches = bl_matches or {}
+    has_bl = bool(bl_matches)
+
     table = Table(title="DriverAtlas Attack Surface Ranking", show_lines=True)
     table.add_column("#", style="dim", width=4)
     table.add_column("Driver", style="cyan", no_wrap=True)
     table.add_column("Score", justify="right", width=7)
     table.add_column("Risk", width=10)
+    if has_bl:
+        table.add_column("Blocklist", width=14)
     table.add_column("Framework", style="green")
     table.add_column("Size")
     table.add_column("Imports", justify="right")
@@ -236,27 +293,40 @@ def _print_rank_table(results):
         if len(score.flags) > 3:
             flags_str += f" (+{len(score.flags) - 3})"
 
-        table.add_row(
-            str(i),
-            profile.name,
-            score_str,
-            risk_str,
+        row = [str(i), profile.name, score_str, risk_str]
+        if has_bl:
+            row.append(_blocklist_cell(bl_matches.get(profile.sha256)))
+        row.extend([
             profile.framework,
             f"{profile.size:,}",
             str(profile.import_count),
             signer,
             flags_str,
-        )
+        ])
+        table.add_row(*row)
 
     console.print(table)
 
 
-def _print_table(profiles):
+def _blocklist_cell(match):
+    """Format a BlocklistMatch for a table cell with Rich markup."""
+    if match is None:
+        return "-"
+    if not match.matched:
+        return "[green]-[/]"
+    if match.is_malicious:
+        return f"[bold red]{match.badge()}[/]"
+    return f"[bold yellow]{match.badge()}[/]"
+
+
+def _print_table(profiles, bl_matches=None):
     """Print a Rich table summary of scanned profiles."""
+    bl_matches = bl_matches or {}
     if len(profiles) == 1:
-        _print_detail(profiles[0])
+        _print_detail(profiles[0], bl_matches.get(profiles[0].sha256))
         return
 
+    has_bl = bool(bl_matches)
     table = Table(title="DriverAtlas Scan Results", show_lines=True)
     table.add_column("Driver", style="cyan", no_wrap=True)
     table.add_column("Machine")
@@ -265,11 +335,13 @@ def _print_table(profiles):
     table.add_column("Imports")
     table.add_column("Signer")
     table.add_column("Size")
+    if has_bl:
+        table.add_column("Blocklist", width=14)
 
     for p in profiles:
         conf = f"{p.framework_confidence:.0%}" if p.framework_confidence else "-"
         signer = (p.signer[:30] + "...") if p.signer and len(p.signer) > 30 else (p.signer or "-")
-        table.add_row(
+        row = [
             p.name,
             p.machine,
             p.framework,
@@ -277,12 +349,15 @@ def _print_table(profiles):
             str(p.import_count),
             signer,
             f"{p.size:,}",
-        )
+        ]
+        if has_bl:
+            row.append(_blocklist_cell(bl_matches.get(p.sha256)))
+        table.add_row(*row)
 
     console.print(table)
 
 
-def _print_detail(p):
+def _print_detail(p, bl_match=None):
     """Print detailed Rich output for a single profile."""
     console.print(f"\n[bold cyan]{p.name}[/]")
     console.print(f"  SHA256:     {p.sha256}")
@@ -294,6 +369,23 @@ def _print_detail(p):
         console.print(f"  Timestamp:  {p.timestamp}")
     if p.signer:
         console.print(f"  Signer:     [green]{p.signer}[/]")
+
+    # Blocklist status
+    if bl_match is not None:
+        if bl_match.matched:
+            for entry in bl_match.entries:
+                if entry.source == "loldrivers":
+                    label = entry.category.upper().replace("VULNERABLE DRIVER", "VULNERABLE DRIVER")
+                    line = f"  [bold yellow]LOLDrivers: {label}[/]"
+                    if entry.mitre_id:
+                        line += f" ({entry.mitre_id})"
+                    if entry.verified:
+                        line += " [green]verified[/]"
+                    console.print(line)
+                elif entry.source == "wdac":
+                    console.print(f"  [bold yellow]WDAC: BLOCKED[/]")
+        else:
+            console.print(f"  [green]Blocklist: Clean[/]")
 
     if p.product_name or p.file_description:
         console.print(f"\n  [bold]Version Info[/]")
@@ -374,11 +466,13 @@ def import_cmd(path, category, vendor, display_name, source):
 @click.option("--telegram-chat", envvar="TELEGRAM_CHAT_ID", help="Telegram chat ID")
 @click.option("--import-to-corpus", is_flag=True, help="Import high-scoring drivers to corpus")
 @click.option("-d", "--directory", type=click.Path(exists=True), help="Scan local directory instead of VT")
-def hunt(vt_key, interval, min_score, limit, telegram_token, telegram_chat, import_to_corpus, directory):
+@click.option("--no-blocklist", is_flag=True, help="Skip blocklist lookup")
+def hunt(vt_key, interval, min_score, limit, telegram_token, telegram_chat, import_to_corpus, directory, no_blocklist):
     """Hunt for vulnerable drivers (VT Intelligence or local directory)."""
     from .hunter import DriverHunter
 
     hunter = DriverHunter()
+    checker = _get_blocklist(no_blocklist)
 
     def _run_once():
         if directory:
@@ -396,12 +490,24 @@ def hunt(vt_key, interval, min_score, limit, telegram_token, telegram_chat, impo
             console.print("[yellow]No findings above threshold.[/]")
             return
 
+        # Blocklist lookup
+        bl_matches = {}
+        if checker:
+            bl_matches = checker.lookup_many([r.sha256 for r in results])
+            for r in results:
+                if r.sha256 in bl_matches:
+                    r.blocklist = bl_matches[r.sha256]
+
+        has_bl = bool(bl_matches)
+
         # Print results table
         table = Table(title=f"Hunt Results ({len(results)} drivers)", show_lines=True)
         table.add_column("#", style="dim", width=4)
         table.add_column("Driver", style="cyan")
         table.add_column("Score", justify="right", width=7)
         table.add_column("Risk", width=10)
+        if has_bl:
+            table.add_column("Blocklist", width=14)
         table.add_column("SHA256")
         table.add_column("Source")
 
@@ -416,7 +522,11 @@ def hunt(vt_key, interval, min_score, limit, telegram_token, telegram_chat, impo
                 score_str = f"[green]{r.score.total:.1f}[/]"
                 risk_str = f"[green]{r.score.risk_level}[/]"
 
-            table.add_row(str(i), r.name, score_str, risk_str, r.sha256[:16] + "...", r.source)
+            row = [str(i), r.name, score_str, risk_str]
+            if has_bl:
+                row.append(_blocklist_cell(bl_matches.get(r.sha256)))
+            row.extend([r.sha256[:16] + "...", r.source])
+            table.add_row(*row)
 
         console.print(table)
 
@@ -438,6 +548,85 @@ def hunt(vt_key, interval, min_score, limit, telegram_token, telegram_chat, impo
                 break
     else:
         _run_once()
+
+
+@main.command()
+@click.argument("targets", nargs=-1, required=True)
+@click.option("-f", "--format", "fmt", type=click.Choice(["table", "json"]), default="table")
+@click.option("-o", "--output", type=click.Path(), help="Write output to file")
+@click.option("--no-network", is_flag=True, help="Skip network fetch, use cache only")
+def check(targets, fmt, output, no_network):
+    """Check SHA256 hashes or .sys files against LOLDrivers and WDAC blocklists."""
+    import re
+    from .blocklist import BlocklistChecker, BlocklistMatch, hash_file_sha256
+
+    sha256_re = re.compile(r'^[0-9a-fA-F]{64}$')
+
+    # Resolve targets to (display_name, sha256) pairs
+    lookups = []
+    for t in targets:
+        if sha256_re.match(t):
+            lookups.append((t[:16] + "...", t.lower()))
+        elif os.path.isfile(t):
+            sha = hash_file_sha256(t)
+            lookups.append((os.path.basename(t), sha))
+        else:
+            console.print(f"[red]Not a valid SHA256 or file path:[/] {t}")
+            sys.exit(1)
+
+    if not lookups:
+        return
+
+    checker = BlocklistChecker()
+    if no_network:
+        checker._fetch_url = lambda url: None
+    checker.load()
+    s = checker.stats
+    if fmt != "json":
+        console.print(f"[dim]Blocklist: {s['loldrivers']} LOLDrivers, {s['wdac']} WDAC hashes[/]")
+
+    results = []
+    for display, sha in lookups:
+        match = checker.lookup(sha)
+        results.append((display, sha, match))
+
+    if fmt == "json":
+        data = [m.to_dict() for _, _, m in results]
+        text = json.dumps(data, indent=2)
+        if output:
+            _write_output(output, text)
+        else:
+            click.echo(text)
+    else:
+        table = Table(title="Blocklist Check", show_lines=True)
+        table.add_column("Target", style="cyan")
+        table.add_column("SHA256")
+        table.add_column("Status", width=8)
+        table.add_column("Source")
+        table.add_column("Category")
+        table.add_column("Details")
+
+        for display, sha, match in results:
+            if match.matched:
+                status = "[bold red]HIT[/]"
+                sources = ", ".join(match.sources)
+                categories = ", ".join(e.category for e in match.entries)
+                details_parts = []
+                for e in match.entries:
+                    if e.driver_name:
+                        details_parts.append(e.driver_name)
+                    if e.mitre_id:
+                        details_parts.append(e.mitre_id)
+                details = "; ".join(details_parts) if details_parts else "-"
+            else:
+                status = "[green]CLEAN[/]"
+                sources = "-"
+                categories = "-"
+                details = "-"
+
+            table.add_row(display, sha[:16] + "...", status, sources, categories, details)
+
+        console.print(table)
 
 
 @main.command()

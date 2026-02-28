@@ -30,15 +30,19 @@ class HuntResult:
     score: AttackSurfaceScore
     path: str = ""
     source: str = "unknown"
+    blocklist: object = None  # Optional BlocklistMatch, set by CLI layer
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "sha256": self.sha256,
             "name": self.name,
             "score": self.score.to_dict(),
             "path": self.path,
             "source": self.source,
         }
+        if self.blocklist is not None:
+            d["blocklist"] = self.blocklist.to_dict()
+        return d
 
 
 class DriverHunter:
