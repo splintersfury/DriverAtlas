@@ -3,7 +3,7 @@
 import logging
 from typing import Optional
 
-from . import IOCTLInfo, IOCTLAccess, IOCTLMethod
+from . import IOCTLInfo, IOCTLAccess, IOCTLMethod, IOCTLDeepDive
 
 logger = logging.getLogger("driveratlas.tier2.ioctl_analyzer")
 
@@ -57,69 +57,133 @@ DEVICE_TYPES = {
     0x003D: "FILE_DEVICE_AVIO",
 }
 
-# Sensitive API calls that indicate security-relevant operations
-SENSITIVE_APIS = {
-    # Physical memory / MMIO
-    "MmMapIoSpace": "mmio_map",
-    "MmMapLockedPages": "mmio_map",
-    "MmMapLockedPagesSpecifyCache": "mmio_map",
-    "ZwMapViewOfSection": "memory_map",
-    "MmMapMemoryDumpMdl": "memory_map",
+# Categorized API calls for deep dive analysis
+API_CATEGORIES = {
+    "PROCESS": [
+        "PsLookupProcessByProcessId", "KeStackAttachProcess",
+        "ZwTerminateProcess", "KeUnstackDetachProcess",
+        "ZwOpenProcess", "ObOpenObjectByPointer",
+    ],
+    "MEMORY": [
+        "MmMapIoSpace", "MmMapLockedPages", "MmMapLockedPagesSpecifyCache",
+        "MmCopyVirtualMemory", "ZwMapViewOfSection", "MmGetPhysicalAddress",
+        "MmAllocateContiguousMemory", "MmAllocateNonCachedMemory",
+    ],
+    "FILE": ["ZwCreateFile", "ZwWriteFile", "ZwReadFile", "ZwDeleteFile"],
+    "REGISTRY": ["ZwSetValueKey", "ZwDeleteKey", "ZwCreateKey", "ZwOpenKey"],
+    "PORT_IO": [
+        "READ_PORT_UCHAR", "WRITE_PORT_UCHAR",
+        "READ_PORT_ULONG", "WRITE_PORT_ULONG",
+    ],
+    "MSR": ["__readmsr", "__writemsr"],
+    "ALLOC": [
+        "ExAllocatePool", "ExAllocatePool2",
+        "ExAllocatePoolWithTag", "ExFreePoolWithTag",
+    ],
+    "CALLBACK": [
+        "ObRegisterCallbacks", "PsSetCreateProcessNotifyRoutine",
+        "PsSetLoadImageNotifyRoutine",
+    ],
+}
 
-    # Memory copy (potential overflow)
+# Build flat SENSITIVE_APIS lookup from API_CATEGORIES
+SENSITIVE_APIS = {}
+_CATEGORY_MAP = {
+    "PROCESS": "process_access",
+    "MEMORY": "mmio_map",
+    "FILE": "file_ops",
+    "REGISTRY": "registry_write",
+    "PORT_IO": "port_io",
+    "MSR": "msr_access",
+    "ALLOC": "pool_alloc",
+    "CALLBACK": "callback_reg",
+}
+for _cat, _apis in API_CATEGORIES.items():
+    _tag = _CATEGORY_MAP.get(_cat, _cat.lower())
+    for _api in _apis:
+        SENSITIVE_APIS[_api] = _tag
+
+# Add extra APIs that don't fit neatly into categories but are still sensitive
+SENSITIVE_APIS.update({
     "memcpy": "memory_copy",
     "memmove": "memory_copy",
     "RtlCopyMemory": "memory_copy",
     "RtlMoveMemory": "memory_copy",
     "RtlCopyBytes": "memory_copy",
-
-    # Process/thread manipulation
-    "ZwOpenProcess": "process_access",
-    "PsLookupProcessByProcessId": "process_access",
-    "KeStackAttachProcess": "process_access",
     "ZwDuplicateObject": "handle_dup",
     "ObReferenceObjectByHandle": "handle_access",
+    "MmMapMemoryDumpMdl": "memory_map",
+})
 
-    # Registry
-    "ZwSetValueKey": "registry_write",
-    "ZwDeleteKey": "registry_write",
-    "ZwCreateKey": "registry_write",
-
-    # I/O ports
-    "READ_PORT_UCHAR": "port_io",
-    "WRITE_PORT_UCHAR": "port_io",
-    "READ_PORT_ULONG": "port_io",
-    "WRITE_PORT_ULONG": "port_io",
-
-    # MSR access
-    "__readmsr": "msr_access",
-    "__writemsr": "msr_access",
-
-    # File operations
-    "ZwCreateFile": "file_ops",
-    "ZwWriteFile": "file_ops",
-    "ZwReadFile": "file_ops",
-
-    # Allocations (overflow targets)
-    "ExAllocatePool": "pool_alloc",
-    "ExAllocatePool2": "pool_alloc",
-    "ExAllocatePoolWithTag": "pool_alloc",
-}
-
-# Labels auto-assigned based on API call categories
+# Concise auto-labels (TheDebugger-style short names)
 AUTO_LABELS = {
-    "mmio_map": "Physical Memory Map",
-    "memory_copy": "Memory Copy",
-    "process_access": "Process Manipulation",
-    "handle_dup": "Handle Duplication",
-    "handle_access": "Handle Access",
-    "registry_write": "Registry Write",
-    "port_io": "I/O Port Access",
-    "msr_access": "MSR Read/Write",
-    "file_ops": "File Operations",
-    "pool_alloc": "Pool Allocation",
-    "memory_map": "Memory Mapping",
+    "mmio_map": "map pages",
+    "memory_copy": "mem copy",
+    "memory_map": "map section",
+    "process_access": "process attach",
+    "handle_dup": "dup handle",
+    "handle_access": "ref handle",
+    "registry_write": "reg write",
+    "port_io": "port I/O",
+    "msr_access": "msr r/w",
+    "file_ops": "file ops",
+    "pool_alloc": "alloc mem",
+    "callback_reg": "set callback",
 }
+
+# Per-API concise labels for deep dive output
+_API_LABELS = {
+    "MmCopyVirtualMemory": "mem copy",
+    "MmMapIoSpace": "map pages",
+    "MmMapLockedPages": "map pages",
+    "MmMapLockedPagesSpecifyCache": "map pages",
+    "MmGetPhysicalAddress": "phys addr",
+    "MmAllocateContiguousMemory": "alloc contig",
+    "MmAllocateNonCachedMemory": "alloc nocache",
+    "ZwMapViewOfSection": "map section",
+    "PsLookupProcessByProcessId": "lookup pid",
+    "KeStackAttachProcess": "process attach",
+    "KeUnstackDetachProcess": "process detach",
+    "ZwTerminateProcess": "process kill",
+    "ZwOpenProcess": "open process",
+    "ObOpenObjectByPointer": "obj by ptr",
+    "ExAllocatePool": "alloc mem",
+    "ExAllocatePool2": "alloc mem",
+    "ExAllocatePoolWithTag": "alloc mem",
+    "ExFreePoolWithTag": "free mem",
+    "ZwCreateFile": "create file",
+    "ZwWriteFile": "write file",
+    "ZwReadFile": "read file",
+    "ZwDeleteFile": "delete file",
+    "ZwSetValueKey": "reg set",
+    "ZwDeleteKey": "reg delete",
+    "ZwCreateKey": "reg create",
+    "ZwOpenKey": "reg open",
+    "READ_PORT_UCHAR": "read port",
+    "WRITE_PORT_UCHAR": "write port",
+    "READ_PORT_ULONG": "read port",
+    "WRITE_PORT_ULONG": "write port",
+    "__readmsr": "read msr",
+    "__writemsr": "write msr",
+    "ObRegisterCallbacks": "reg callbacks",
+    "PsSetCreateProcessNotifyRoutine": "proc notify",
+    "PsSetLoadImageNotifyRoutine": "img notify",
+    "memcpy": "mem copy",
+    "memmove": "mem copy",
+    "RtlCopyMemory": "mem copy",
+    "RtlMoveMemory": "mem copy",
+    "RtlCopyBytes": "mem copy",
+    "ZwDuplicateObject": "dup handle",
+    "ObReferenceObjectByHandle": "ref handle",
+}
+
+# Validation APIs to check for security posture
+_VALIDATION_APIS = {
+    "ProbeForRead", "ProbeForWrite", "SeAccessCheck",
+}
+
+# IRP completion APIs
+_IRP_COMPLETION_APIS = {"IofCompleteRequest", "IoCompleteRequest"}
 
 
 def parse_dispatch_table(dispatch_data: dict) -> list:
@@ -251,3 +315,149 @@ def summarize_ioctls(ioctls: list) -> dict:
             ),
         },
     }
+
+
+def deep_dive_ioctl(ioctl: IOCTLInfo) -> IOCTLDeepDive:
+    """Produce a per-IOCTL deep dive with categorized APIs, validation, and risk.
+
+    Args:
+        ioctl: A parsed IOCTLInfo object (with decompiled_snippet populated)
+
+    Returns:
+        IOCTLDeepDive with categorized API calls, security validation status,
+        IRP completion check, risk assessment, and concise auto-label.
+    """
+    snippet = ioctl.decompiled_snippet or ""
+
+    # --- 1. Categorized API calls ---
+    api_categories: dict[str, list[str]] = {}
+    all_found_apis: list[str] = []
+
+    for category, apis in API_CATEGORIES.items():
+        found = [api for api in apis if api in snippet]
+        if found:
+            api_categories[category] = found
+            all_found_apis.extend(found)
+
+    # Check for OTHER known APIs not in the categories above
+    other_apis = []
+    for api, tag in SENSITIVE_APIS.items():
+        if api in snippet and api not in all_found_apis:
+            other_apis.append(api)
+            all_found_apis.append(api)
+    if other_apis:
+        api_categories["OTHER"] = other_apis
+
+    # --- 2. Security validation status ---
+    has_probe_read = "ProbeForRead" in snippet
+    has_probe_write = "ProbeForWrite" in snippet
+    has_access_check = "SeAccessCheck" in snippet
+    has_try_except = ("try {" in snippet or "__try" in snippet
+                      or "_SEH_" in snippet or "except (" in snippet)
+
+    checks_found = []
+    if has_probe_read:
+        checks_found.append("ProbeForRead")
+    if has_probe_write:
+        checks_found.append("ProbeForWrite")
+    if has_access_check:
+        checks_found.append("SeAccessCheck")
+    if has_try_except:
+        checks_found.append("try/except")
+
+    validation_status = ", ".join(checks_found) if checks_found else "NONE"
+
+    # --- 3. IRP completion check ---
+    has_irp_completion = any(api in snippet for api in _IRP_COMPLETION_APIS)
+    irp_completion_risk = "" if has_irp_completion else \
+        "No IRP completion detected (may leak IRP or cause hang)"
+
+    # --- 4. Risk assessment ---
+    risk = _assess_risk(ioctl, api_categories, validation_status,
+                        has_irp_completion)
+
+    # --- 5. Concise auto-label ---
+    label_parts = []
+    seen_labels = set()
+    for api in all_found_apis:
+        lbl = _API_LABELS.get(api)
+        if lbl and lbl not in seen_labels:
+            seen_labels.add(lbl)
+            label_parts.append(lbl)
+    label = " + ".join(label_parts) if label_parts else ioctl.label
+
+    return IOCTLDeepDive(
+        code_hex=ioctl.code_hex,
+        method=ioctl.method.name,
+        access=ioctl.access.name,
+        label=label,
+        api_categories=api_categories,
+        has_probe_for_read=has_probe_read,
+        has_probe_for_write=has_probe_write,
+        has_access_check=has_access_check,
+        has_try_except=has_try_except,
+        validation_status=validation_status,
+        has_irp_completion=has_irp_completion,
+        irp_completion_risk=irp_completion_risk,
+        risk=risk,
+    )
+
+
+def deep_dive_all(ioctls: list) -> list:
+    """Run deep_dive_ioctl on every IOCTL in a list.
+
+    Args:
+        ioctls: List of IOCTLInfo objects
+
+    Returns:
+        List of IOCTLDeepDive objects, sorted by IOCTL code
+    """
+    return [deep_dive_ioctl(ioctl) for ioctl in ioctls]
+
+
+def _assess_risk(ioctl: IOCTLInfo, api_categories: dict,
+                 validation_status: str, has_irp_completion: bool) -> str:
+    """Generate a one-line risk string based on what's found in the handler."""
+    risks = []
+
+    # NEITHER I/O with no validation is the highest risk
+    if ioctl.uses_neither_io and validation_status == "NONE":
+        risks.append("NEITHER I/O with no buffer validation")
+    elif ioctl.uses_neither_io:
+        risks.append("NEITHER I/O (raw user pointers)")
+
+    # Dangerous API combos
+    if "MEMORY" in api_categories:
+        mem_apis = api_categories["MEMORY"]
+        if any(a in mem_apis for a in ("MmMapIoSpace", "MmMapLockedPages",
+                                        "MmMapLockedPagesSpecifyCache")):
+            risks.append("maps physical/locked pages to usermode")
+        if "MmCopyVirtualMemory" in mem_apis:
+            risks.append("cross-process memory copy")
+
+    if "PROCESS" in api_categories:
+        proc_apis = api_categories["PROCESS"]
+        if "ZwTerminateProcess" in proc_apis:
+            risks.append("can terminate arbitrary process")
+        if "KeStackAttachProcess" in proc_apis:
+            risks.append("attaches to arbitrary process context")
+
+    if "MSR" in api_categories:
+        msr_apis = api_categories["MSR"]
+        if "__writemsr" in msr_apis:
+            risks.append("writes arbitrary MSR (code exec risk)")
+        elif "__readmsr" in msr_apis:
+            risks.append("reads arbitrary MSR")
+
+    if "PORT_IO" in api_categories:
+        risks.append("direct I/O port access")
+
+    if not has_irp_completion:
+        risks.append("no IRP completion")
+
+    if not risks:
+        if not api_categories:
+            return "No sensitive APIs detected"
+        return "Low — standard kernel APIs only"
+
+    return "; ".join(risks)

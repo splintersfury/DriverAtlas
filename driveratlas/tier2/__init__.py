@@ -81,6 +81,36 @@ class IOCTLInfo:
 
 
 @dataclass
+class IOCTLDeepDive:
+    """Per-IOCTL deep dive analysis with categorized APIs, validation status, and risk."""
+
+    code_hex: str  # "0x22200C"
+    method: str  # "BUFFERED", "NEITHER", etc.
+    access: str  # "ANY", "READ", etc.
+    label: str  # Concise auto-label like "mem copy", "map pages"
+
+    # Categorized API calls found in the handler
+    api_categories: dict = field(default_factory=dict)  # category -> [api_name, ...]
+
+    # Security validation status
+    has_probe_for_read: bool = False
+    has_probe_for_write: bool = False
+    has_access_check: bool = False
+    has_try_except: bool = False
+    validation_status: str = "NONE"  # "NONE" | list of checks found
+
+    # IRP completion
+    has_irp_completion: bool = False
+    irp_completion_risk: str = ""
+
+    # Overall risk assessment (one-liner)
+    risk: str = ""
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
 class TaintPath:
     """A data flow from user-controlled input to a sensitive API."""
 
@@ -119,6 +149,7 @@ class Gadget:
     instruction_bytes: bytes = b""
     disassembly: str = ""
     gadget_type: str = ""  # "rop", "jop", "cop"
+    category: str = ""  # "reg-control", "memory-read", "memory-write", "jmp-reg", "stack-pivot", "syscall", "misc"
 
     def to_dict(self) -> dict:
         d = asdict(self)

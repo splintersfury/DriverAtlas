@@ -664,30 +664,97 @@ def corpus(category):
 @click.option("--pdb", type=click.Path(exists=True), help="PDB symbol file")
 @click.option("--timeout", default=600, help="Ghidra timeout in seconds")
 @click.option("--gadgets/--no-gadgets", default=True, help="Scan for ROP/JOP gadgets")
-@click.option("--yara", type=click.Path(), help="Write YARA rules to this path")
-@click.option("--json-output", is_flag=True, help="Output raw JSON instead of table")
-def deep(driver_path, ghidra_home, output, pdb, timeout, gadgets, yara, json_output):
-    """Tier 2 deep analysis — Ghidra-powered dispatch, taint, gadgets, and YARA."""
+@click.option("--yara/--no-yara", default=True, help="Generate YARA rules")
+@click.option("--yara-output", type=click.Path(), help="Write YARA rules to this path")
+@click.option("--json-output", is_flag=True, help="Output raw JSON instead of terminal display")
+def deep(driver_path, ghidra_home, output, pdb, timeout, gadgets, yara, yara_output, json_output):
+    """Tier 2 deep analysis -- Ghidra-powered dispatch, taint, gadgets, and YARA."""
     import hashlib
     from .tier2 import Tier2Result, IOCTLInfo
     from .tier2.ghidra_runner import GhidraRunner
-    from .tier2.ioctl_analyzer import parse_dispatch_table, summarize_ioctls, device_type_name
+    from .tier2.ioctl_analyzer import (
+        parse_dispatch_table, summarize_ioctls, device_type_name,
+        deep_dive_all, SENSITIVE_APIS,
+    )
     from .tier2.taint_analyzer import analyze_taint, analyze_security_checks
     from .tier2.gadget_scanner import scan_gadgets, generate_gadget_summary
-    from .tier2.yara_generator import generate_yara
+    from .tier2.yara_generator import generate_yara, DANGEROUS_IMPORTS
 
-    # Compute SHA256
-    with open(driver_path, "rb") as f:
-        sha256 = hashlib.sha256(f.read()).hexdigest()
+    driver_name = os.path.basename(driver_path)
 
+    # ── Phase 0: PE scan for metadata, mitigations, imports ──
+    classifier = _get_classifier()
+    cats_path = _CATEGORIES_PATH if os.path.exists(_CATEGORIES_PATH) else None
+    profile = scan_driver(driver_path, classifier=classifier, categories_path=cats_path)
+    sha256 = profile.sha256
+
+    console.print(f"[*] Analysis started: {driver_name}")
+    console.print(f"[*] SHA-256  : {sha256}")
+    console.print(f"[*] imphash  : {profile.imphash}")
+    console.print(f"[*] Architecture: {profile.machine} | Kernel Driver: "
+                  f"{'Yes' if profile.subsystem == 'native' else 'No'}")
+    console.print(f"[*] Image Base: 0x{_get_image_base(driver_path):X} | "
+                  f"Imports: {profile.import_count} | "
+                  f"Sections: {len(profile.sections)}")
+
+    # Mitigations
+    if profile.mitigations_on:
+        console.print(f"[*] Mitigations ON : {', '.join(profile.mitigations_on)}")
+    if profile.mitigations_off:
+        console.print(f"[!] Mitigations OFF: {', '.join(profile.mitigations_off)}")
+
+    # Signer
+    if profile.signer:
+        console.print(f"\n[*] -- Authenticode Signature --")
+        console.print(f"[*]   Signer  : {profile.signer}")
+        if profile.company_name:
+            console.print(f"[*]   Org     : {profile.company_name}")
+
+    # Device names
+    if profile.device_names:
+        for dn in profile.device_names:
+            accessible = "(user-accessible)" if "\\DosDevices\\" in str(profile.symbolic_links) else ""
+            console.print(f"[+] Found device: {dn} {accessible}")
+    if profile.symbolic_links:
+        for sl in profile.symbolic_links:
+            console.print(f"[+] Found device: {sl} (user-accessible)")
+
+    # Imports with dangerous highlighting
+    console.print(f"[*] Scanning imports...")
+    dangerous_found = []
+    safe_found = []
+    all_imports_flat = []
+    for dll, funcs in profile.imports.items():
+        all_imports_flat.extend(funcs)
+    for imp in all_imports_flat:
+        if imp in DANGEROUS_IMPORTS:
+            dangerous_found.append(imp)
+        elif imp in SENSITIVE_APIS:
+            dangerous_found.append(imp)
+    # Deduplicate while preserving order
+    seen = set()
+    deduped_dangerous = []
+    for imp in dangerous_found:
+        if imp not in seen:
+            seen.add(imp)
+            deduped_dangerous.append(imp)
+    if deduped_dangerous:
+        console.print(f"[!] {', '.join(deduped_dangerous)}")
+    # Show a few notable non-dangerous imports
+    notable_safe = [f for f in all_imports_flat
+                    if f.startswith(("Io", "Ke", "Ob", "Ps", "Rtl", "Zw", "Mm"))
+                    and f not in seen][:5]
+    if notable_safe:
+        console.print(f"[*] {', '.join(notable_safe)}")
+
+    # ── Ghidra analysis ──
     try:
         runner = GhidraRunner(ghidra_home=ghidra_home, timeout=timeout)
     except FileNotFoundError as e:
         console.print(f"[red]{e}[/]")
         raise SystemExit(1)
 
-    console.print(f"[bold]Ghidra {runner.version()}[/] — analyzing [cyan]{os.path.basename(driver_path)}[/]")
-
+    console.print(f"\n[*] Ghidra {runner.version()} -- analyzing...")
     dispatch_data = runner.analyze(driver_path, output_dir=output, pdb_path=pdb)
 
     if "error" in dispatch_data and not dispatch_data.get("irp_handlers"):
@@ -706,13 +773,12 @@ def deep(driver_path, ghidra_home, output, pdb, timeout, gadgets, yara, json_out
     gadget_list = []
     gadget_summary = {"total": 0}
     if gadgets:
-        console.print("[dim]Scanning for ROP/JOP gadgets...[/]")
         gadget_list = scan_gadgets(driver_path, max_gadgets=500)
         gadget_summary = generate_gadget_summary(gadget_list)
 
     # Build Tier2Result
     result = Tier2Result(
-        driver_name=os.path.basename(driver_path),
+        driver_name=driver_name,
         sha256=sha256,
         driver_entry_addr=dispatch_data.get("driver_entry", ""),
         irp_handlers=irp_handlers,
@@ -725,136 +791,128 @@ def deep(driver_path, ghidra_home, output, pdb, timeout, gadgets, yara, json_out
     )
 
     # Phase 4: YARA generation
+    yara_text = ""
     if yara:
-        yara_text = generate_yara(result, output_path=yara)
-        if yara_text:
-            console.print(f"[green]YARA rules written to {yara}[/]")
+        yara_text = generate_yara(result, output_path=yara_output, profile=profile)
 
     if json_output:
         click.echo(json.dumps(result.to_dict(), indent=2))
         return
 
-    # ── Display results ──
-
-    # IRP handlers table
-    if irp_handlers:
-        t = Table(title="IRP Dispatch Table", show_lines=True)
-        t.add_column("IRP Major", style="cyan")
-        t.add_column("Handler", style="green")
-        t.add_column("Address", style="dim")
-
-        for irp_name in sorted(irp_handlers, key=lambda k: irp_handlers[k].get("index", 99)):
-            info = irp_handlers[irp_name]
-            t.add_row(irp_name, info["handler_name"], info.get("handler_addr", ""))
-
-        console.print(t)
-    else:
-        console.print("[yellow]No IRP handlers found[/]")
-
-    # IOCTL table
+    # ── Display: Detected IOCTL codes (TheDebugger style) ──
     if ioctls:
-        t = Table(title=f"IOCTL Dispatch ({len(ioctls)} codes)", show_lines=True)
-        t.add_column("Code", style="cyan")
-        t.add_column("Device", style="dim")
-        t.add_column("Func", justify="right")
-        t.add_column("Method", style="bold")
-        t.add_column("Access")
-        t.add_column("Handler", style="green")
-        t.add_column("APIs", style="yellow")
-        t.add_column("Label", style="magenta")
-
+        console.print(f"[*] Detected IOCTL codes ({len(ioctls)}):")
         for ioctl in ioctls:
-            method_style = "[red]NEITHER[/]" if ioctl.uses_neither_io else ioctl.method.name
-            dt_name = device_type_name(ioctl.device_type)
-            dt_short = dt_name.replace("FILE_DEVICE_", "").replace("VENDOR_DEFINED", "VENDOR")
-
-            t.add_row(
-                ioctl.code_hex,
-                dt_short,
-                str(ioctl.function),
-                method_style,
-                ioctl.access.name,
-                ioctl.handler_name[:40] if ioctl.handler_name else "",
-                ", ".join(ioctl.api_calls[:3]) if ioctl.api_calls else "",
-                ioctl.label or "",
+            method_str = ioctl.method.name
+            access_str = f"FILE_{'ANY' if ioctl.access.name == 'ANY' else ioctl.access.name}_ACCESS"
+            label_str = f" -> {ioctl.label}" if ioctl.label else ""
+            marker = "[!]" if ioctl.uses_neither_io or ioctl.api_calls else "[*]"
+            any_user = "[!] any-user" if ioctl.access == ioctl.access.ANY else ""
+            console.print(
+                f"  {ioctl.code_hex}  ({method_str}, {access_str})"
+                f"{label_str}  {any_user}"
             )
-
-        console.print(t)
-
-        summary = summarize_ioctls(ioctls)
-        risk = summary.get("risk_indicators", {})
-        console.print(f"\n[bold]IOCTL Summary:[/] {summary['total']} IOCTLs")
-        console.print(f"  Methods: {summary['methods']}")
-        if risk.get("neither_io"):
-            console.print(f"  [red]NEITHER I/O: {risk['neither_io']} (raw user pointers)[/]")
-        if risk.get("has_mmio"):
-            console.print(f"  [red]Physical memory mapping detected[/]")
-        if risk.get("has_msr"):
-            console.print(f"  [red]MSR access detected[/]")
-        if risk.get("has_process_access"):
-            console.print(f"  [yellow]Process manipulation detected[/]")
     else:
-        console.print("[yellow]No IOCTL codes found[/]")
+        console.print("[*] No IOCTL codes detected")
 
-    # Taint paths table
+    # ── Display: Per-IOCTL deep dive (TheDebugger style) ──
+    if ioctls:
+        deep_dives = deep_dive_all(ioctls)
+        console.print()
+        for dd in deep_dives:
+            # Header line
+            label_part = f" ({dd.label})" if dd.label else ""
+            handler = ""
+            # Find handler address from the matching ioctl
+            for ioctl in ioctls:
+                if ioctl.code_hex == dd.code_hex and ioctl.handler_addr:
+                    handler = f"  @ {ioctl.handler_addr}"
+                    break
+            console.print(f"[!] {dd.code_hex}{label_part}{handler}")
+
+            # Categorized APIs
+            for cat, apis in dd.api_categories.items():
+                marker = "[!]" if cat in ("MEMORY", "MSR", "PROCESS") else "[.]"
+                console.print(f"  {marker} {cat:10s}: {', '.join(apis)}")
+
+            # Security validation
+            sec_marker = "[-]" if dd.validation_status == "NONE" else "[*]"
+            console.print(f"  {sec_marker} SECURITY  : {dd.validation_status}")
+
+            # IRP completion
+            if dd.has_irp_completion:
+                console.print(f"  [*] IRP       : Completion detected")
+            else:
+                console.print(f"  [-] IRP       : No completion detected")
+
+            # Risk
+            if dd.risk:
+                risk_marker = "[!]" if "NEITHER" in dd.risk or "arbitrary" in dd.risk or "exec" in dd.risk else "[-]"
+                console.print(f"  {risk_marker} RISK: {dd.risk}")
+            console.print()
+
+    # ── Display: Taint paths ──
     if taint_paths:
-        t = Table(title=f"Taint Paths ({len(taint_paths)} flows)", show_lines=True)
-        t.add_column("IOCTL", style="cyan")
-        t.add_column("Source", style="yellow")
-        t.add_column("Sink", style="red")
-        t.add_column("Confidence", justify="right")
-        t.add_column("Description")
-
+        console.print(f"[!] Taint paths ({len(taint_paths)} flows):")
         for tp in sorted(taint_paths, key=lambda x: -x.confidence):
-            conf_style = "[red]" if tp.confidence >= 0.7 else "[yellow]" if tp.confidence >= 0.5 else "[dim]"
-            t.add_row(
-                tp.ioctl_code,
-                tp.source,
-                tp.sink,
-                f"{conf_style}{tp.confidence:.0%}[/]",
-                tp.path_description[:60],
+            marker = "[!]" if tp.confidence >= 0.7 else "[-]"
+            console.print(
+                f"  {marker} {tp.ioctl_code}: {tp.source} -> {tp.sink} "
+                f"({tp.confidence:.0%}) {tp.path_description[:50]}"
             )
+        console.print()
 
-        console.print(t)
-
-    # Security checks summary
+    # ── Display: Security checks summary ──
     if security_checks:
         missing = [c for c in security_checks if not c.present]
         present = [c for c in security_checks if c.present]
-
         if missing:
-            # Group by check type
-            missing_types = {}
-            for c in missing:
-                missing_types.setdefault(c.check_type, []).append(c.ioctl_code)
+            missing_types = set(c.check_type for c in missing)
+            console.print(
+                f"[!] Missing security checks ({len(missing_types)} types): "
+                f"{', '.join(sorted(missing_types))}"
+            )
+        console.print(
+            f"[*] Security checks: {len(present)} present, "
+            f"{len(missing)} missing"
+        )
+        console.print()
 
-            t = Table(title=f"Missing Security Checks ({len(missing_types)} types)", show_lines=True)
-            t.add_column("Check", style="red")
-            t.add_column("Severity", style="bold")
-            t.add_column("Affected IOCTLs")
-
-            for check_type, codes in sorted(missing_types.items()):
-                sev = next((c.severity for c in missing if c.check_type == check_type), "medium")
-                sev_style = {"critical": "[red]", "high": "[red]", "medium": "[yellow]", "low": "[dim]"}.get(sev, "")
-                t.add_row(
-                    check_type,
-                    f"{sev_style}{sev}[/]",
-                    ", ".join(codes[:5]) + (f" +{len(codes)-5}" if len(codes) > 5 else ""),
-                )
-
-            console.print(t)
-
-        console.print(f"  Security checks: [green]{len(present)} present[/], [red]{len(missing)} missing[/]")
-
-    # Gadget summary
+    # ── Display: Gadgets (TheDebugger style) ──
     if gadget_summary.get("total"):
-        console.print(f"\n[bold]Gadgets:[/] {gadget_summary['total']} found ({gadget_summary.get('by_type', {})})")
-        interesting = gadget_summary.get("interesting", [])
-        if interesting:
-            console.print(f"  [yellow]Interesting gadgets ({len(interesting)}):[/]")
-            for g in interesting[:10]:
+        console.print(f"[*] {gadget_summary.get('summary_line', '')}")
+        interesting_by_cat = gadget_summary.get("interesting_by_category", {})
+        for cat, examples in interesting_by_cat.items():
+            console.print(f"  [{cat}]:")
+            for g in examples[:3]:
                 console.print(f"    {g['address']}: {g['disassembly']}")
+        high_value = gadget_summary.get("high_value", [])
+        if high_value:
+            console.print(f"  [!] High-value gadgets ({len(high_value)}):")
+            for g in high_value[:5]:
+                console.print(f"    {g['address']}: {g['disassembly']} [{g['category']}]")
+        console.print()
+
+    # ── Display: YARA rule (TheDebugger style -- inline) ──
+    if yara_text:
+        console.print("[*] Auto-generated YARA rule:")
+        console.print(yara_text)
+        if yara_output:
+            console.print(f"\n[*] YARA rules written to {yara_output}")
+        console.print()
 
     elapsed = dispatch_data.get("_analysis_seconds", 0)
     if elapsed:
-        console.print(f"\n[dim]Analysis completed in {elapsed:.1f}s[/]")
+        console.print(f"[dim]Analysis completed in {elapsed:.1f}s[/]")
+
+
+def _get_image_base(driver_path: str) -> int:
+    """Get PE ImageBase for display."""
+    try:
+        import pefile
+        pe = pefile.PE(driver_path, fast_load=True)
+        base = pe.OPTIONAL_HEADER.ImageBase
+        pe.close()
+        return base
+    except Exception:
+        return 0

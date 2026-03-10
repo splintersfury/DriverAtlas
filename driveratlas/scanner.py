@@ -72,6 +72,11 @@ class DriverProfile:
     # Sections
     sections: list = field(default_factory=list)
 
+    # PE mitigations
+    mitigations_on: list = field(default_factory=list)
+    mitigations_off: list = field(default_factory=list)
+    imphash: str = ""
+
     # Tier 2 deep analysis (populated by driveratlas.tier2)
     tier2: Optional[dict] = None
 
@@ -112,6 +117,7 @@ def scan_driver(path: str, classifier=None, categories_path: str | None = None) 
     signer = _extract_signer(path, pe)
     strings = _extract_strings(raw)
     sections = _extract_sections(pe)
+    mitigations_on, mitigations_off, imphash = _extract_mitigations(pe, imports)
 
     # Categorize imports if we have the categories file
     api_cats = {}
@@ -172,6 +178,9 @@ def scan_driver(path: str, classifier=None, categories_path: str | None = None) 
         notable_strings=strings.get("notable_strings", []),
         api_categories=api_cats,
         sections=sections,
+        mitigations_on=mitigations_on,
+        mitigations_off=mitigations_off,
+        imphash=imphash,
     )
 
 
@@ -366,6 +375,74 @@ def _extract_sections(pe: pefile.PE) -> list:
             "characteristics": f"0x{s.Characteristics:08X}",
         })
     return sections
+
+
+def _extract_mitigations(pe: pefile.PE, imports: dict) -> tuple:
+    """Extract PE security mitigations, imphash, and notable absent mitigations."""
+    on = []
+    off = []
+
+    # imphash
+    try:
+        imphash = pe.get_imphash() or ""
+    except Exception:
+        imphash = ""
+
+    # DllCharacteristics flags
+    dll_chars = pe.OPTIONAL_HEADER.DllCharacteristics
+    mitigation_flags = {
+        0x0020: "HIGH_ENTROPY_VA",
+        0x0040: "DYNAMIC_BASE",      # ASLR
+        0x0100: "NX_COMPAT",         # DEP
+        0x0200: "NO_ISOLATION",
+        0x0400: "NO_SEH",
+        0x1000: "GUARD_CF",
+        0x4000: "FORCE_INTEGRITY",
+    }
+    # Notable security mitigations whose absence is worth flagging
+    notable_absent = {0x0040, 0x0100, 0x1000, 0x4000}
+
+    for flag, name in mitigation_flags.items():
+        if dll_chars & flag:
+            on.append(name)
+        elif flag in notable_absent:
+            off.append(name)
+
+    # GS_COOKIE — check for stack cookie imports
+    all_imports_flat = []
+    for funcs in imports.values():
+        all_imports_flat.extend(funcs)
+    gs_symbols = {"__security_cookie", "__security_check_cookie",
+                  "_security_cookie", "_security_check_cookie"}
+    if gs_symbols & set(all_imports_flat):
+        on.append("GS_COOKIE")
+    else:
+        off.append("GS_COOKIE")
+
+    # HVCI — check IMAGE_LOAD_CONFIG_DIRECTORY for GuardFlags
+    try:
+        if hasattr(pe, "DIRECTORY_ENTRY_LOAD_CONFIG"):
+            lc = pe.DIRECTORY_ENTRY_LOAD_CONFIG.struct
+            # IMAGE_GUARD_CF_INSTRUMENTED = 0x00000100
+            # IMAGE_GUARD_CFW_INSTRUMENTED = 0x00000200
+            guard_flags = getattr(lc, "GuardFlags", 0) or 0
+            # IMAGE_GUARD_RETPOLINE_PRESENT = 0x00100000
+            # Check for kernel-mode HVCI compatibility via
+            # IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT (bit 0) in
+            # GuardXFGTableDispatchFunctionPointer or DynamicValueRelocTableSection
+            # Simpler: check IMAGE_LOAD_CONFIG for GuardCFCheckFunctionPointer != 0
+            # which indicates CF instrumentation present
+            if guard_flags & 0x00010000:  # IMAGE_GUARD_RF_INSTRUMENTED (retflow)
+                on.append("RETPOLINE")
+            # HVCI readiness: FORCE_INTEGRITY flag already captured above;
+            # also check for IMAGE_DLLCHARACTERISTICS_EX if available
+            ex_chars = getattr(lc, "DllCharacteristicsEx", 0) or 0
+            if ex_chars & 0x01:  # IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT
+                on.append("CET_COMPAT")
+    except Exception:
+        pass
+
+    return on, off, imphash
 
 
 def _categorize_imports(imports: dict, categories_path: str) -> dict:

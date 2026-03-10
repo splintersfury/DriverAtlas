@@ -7,6 +7,7 @@ that could be used in exploit chains.
 
 import logging
 import os
+import re
 import struct
 from typing import Optional
 
@@ -137,6 +138,51 @@ def scan_gadgets(
     return gadgets[:max_gadgets]
 
 
+def _classify_gadget(disassembly: str) -> str:
+    """Classify a gadget into a functional category matching TheDebugger output.
+
+    Categories: stack-pivot, memory-read, memory-write, reg-control, jmp-reg, syscall, misc
+    """
+    d = disassembly.lower()
+
+    # stack-pivot: xchg with rsp/esp, mov rsp/esp, pop rsp/esp, leave
+    if any(pat in d for pat in [
+        "xchg rsp", "xchg esp", "xchg rax, rsp", "xchg rcx, rsp",
+        "xchg rdx, rsp", "xchg rbx, rsp", "xchg rsi, rsp", "xchg rdi, rsp",
+        "mov rsp", "mov esp", "pop rsp", "pop esp", "leave",
+    ]):
+        return "stack-pivot"
+
+    # syscall: syscall instruction or int 0x2e (Windows fast syscall)
+    if "syscall" in d or "int 0x2e" in d:
+        return "syscall"
+
+    # memory-write: mov [reg], reg / stos / mov dword ptr [
+    if any(pat in d for pat in ["stos", "mov dword ptr [", "mov qword ptr [", "mov word ptr [", "mov byte ptr ["]):
+        return "memory-write"
+    # Pattern: mov [rXX], rXX (store to memory via register indirect)
+    if re.search(r'mov\s+\[r\w+', d):
+        return "memory-write"
+
+    # memory-read: mov rXX, [rXX] / movzx / lods
+    if any(pat in d for pat in ["movzx", "lods"]):
+        return "memory-read"
+    if re.search(r'mov\s+r\w+,\s*\[', d) or re.search(r'mov\s+e\w+,\s*\[', d):
+        return "memory-read"
+
+    # jmp-reg: jmp to register (already identified by terminator, but classify explicitly)
+    if re.search(r'jmp\s+(rax|rcx|rdx|rbx|rsp|rbp|rsi|rdi|r\d+|eax|ecx|edx|ebx|esp|ebp|esi|edi)', d):
+        return "jmp-reg"
+
+    # reg-control: pop rXX (any register), xchg (non-rsp)
+    if re.search(r'pop\s+(rax|rcx|rdx|rbx|rbp|rsi|rdi|r\d+|eax|ecx|edx|ebx|ebp|esi|edi)', d):
+        return "reg-control"
+    if "xchg" in d:
+        return "reg-control"
+
+    return "misc"
+
+
 def _find_gadgets_at_terminators(
     data: bytes,
     section_rva: int,
@@ -197,6 +243,7 @@ def _find_gadgets_at_terminators(
                     instruction_bytes=candidate,
                     disassembly=disasm,
                     gadget_type=gadget_type,
+                    category=_classify_gadget(disasm),
                 ))
 
                 if len(gadgets) >= remaining:
@@ -206,33 +253,71 @@ def _find_gadgets_at_terminators(
 
 
 def generate_gadget_summary(gadgets: list) -> dict:
-    """Generate a summary of found gadgets for reporting."""
+    """Generate a summary of found gadgets for reporting.
+
+    Categorizes gadgets functionally (matching TheDebugger output):
+    reg-control, misc, memory-read, memory-write, jmp-reg, stack-pivot, syscall
+    """
     if not gadgets:
         return {"total": 0}
 
-    by_type = {}
-    for g in gadgets:
-        by_type.setdefault(g.gadget_type, []).append(g)
+    # Category ordering matches TheDebugger convention
+    CATEGORY_ORDER = [
+        "reg-control", "misc", "memory-read",
+        "jmp-reg", "memory-write", "stack-pivot", "syscall",
+    ]
 
-    # Find interesting gadgets (stack pivots, syscall, etc.)
-    interesting = []
+    by_category = {}
+    for g in gadgets:
+        by_category.setdefault(g.category, []).append(g)
+
+    # Build ordered category counts
+    category_counts = {}
+    for cat in CATEGORY_ORDER:
+        if cat in by_category:
+            category_counts[cat] = len(by_category[cat])
+    # Include any categories not in the predefined order
+    for cat in sorted(by_category.keys()):
+        if cat not in category_counts:
+            category_counts[cat] = len(by_category[cat])
+
+    # Build the one-line summary string
+    parts = [f"{cat}: {count}" for cat, count in category_counts.items()]
+    summary_line = f"ROP/JOP Gadgets: {len(gadgets)} ({', '.join(parts)})"
+
+    # Group interesting gadgets by category with examples
+    # "Interesting" = non-misc categories (functional gadgets are more useful for exploit dev)
+    interesting_by_category = {}
+    for cat in CATEGORY_ORDER:
+        if cat == "misc":
+            continue
+        cat_gadgets = by_category.get(cat, [])
+        if cat_gadgets:
+            # Include up to 5 examples per category
+            interesting_by_category[cat] = [
+                {
+                    "address": g.address_hex,
+                    "disassembly": g.disassembly,
+                    "type": g.gadget_type,
+                }
+                for g in cat_gadgets[:5]
+            ]
+
+    # Also flag high-value gadgets: MSR, I/O, wrmsr/rdmsr
+    high_value = []
     for g in gadgets:
         d = g.disassembly.lower()
-        if any(pat in d for pat in [
-            "xchg", "mov rsp", "mov esp",  # Stack pivots
-            "pop rsp", "pop esp",
-            "syscall", "int 0x2e",  # Syscall
-            "wrmsr", "rdmsr",  # MSR access
-            "in ", "out ",  # I/O ports
-        ]):
-            interesting.append({
+        if any(pat in d for pat in ["wrmsr", "rdmsr", "in ", "out "]):
+            high_value.append({
                 "address": g.address_hex,
                 "disassembly": g.disassembly,
-                "type": g.gadget_type,
+                "category": g.category,
             })
 
     return {
         "total": len(gadgets),
-        "by_type": {k: len(v) for k, v in by_type.items()},
-        "interesting": interesting[:50],
+        "summary_line": summary_line,
+        "by_category": category_counts,
+        "interesting_by_category": interesting_by_category,
+        "high_value": high_value[:20],
     }

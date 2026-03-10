@@ -136,7 +136,7 @@ class TestIOCTLAnalyzer:
         assert len(ioctls) == 1
         assert ioctls[0].code == 0x22200C
         assert "MmMapIoSpace" in ioctls[0].api_calls
-        assert "Physical Memory Map" in ioctls[0].label
+        assert "map pages" in ioctls[0].label
 
     def test_parse_multiple_sorted(self):
         from driveratlas.tier2.ioctl_analyzer import parse_dispatch_table
@@ -385,7 +385,8 @@ class TestGadgetScanner:
             gadgets = scan_gadgets(pe_path, max_gadgets=100)
             summary = generate_gadget_summary(gadgets)
             assert summary["total"] > 0
-            assert "rop" in summary.get("by_type", {})
+            assert summary.get("by_category") is not None
+            assert any(count > 0 for count in summary["by_category"].values())
         finally:
             os.unlink(pe_path)
 

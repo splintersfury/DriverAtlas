@@ -17,22 +17,62 @@ from . import Tier2Result, IOCTLInfo
 
 logger = logging.getLogger("driveratlas.tier2.yara_generator")
 
+# Imports considered dangerous/interesting for YARA detection.
+# These map closely to TheDebugger's output format.
+DANGEROUS_IMPORTS = {
+    "MmProbeAndLockPages",
+    "MmMapLockedPagesSpecifyCache",
+    "MmMapLockedPages",
+    "MmMapIoSpace",
+    "MmIsAddressValid",
+    "IoGetCurrentProcess",
+    "ObRegisterCallbacks",
+    "ObOpenObjectByPointer",
+    "ZwOpenProcess",
+    "ZwDuplicateObject",
+    "ZwTerminateProcess",
+    "KeStackAttachProcess",
+    "KeInsertQueueApc",
+    "PsCreateSystemThread",
+    "PsSetCreateProcessNotifyRoutine",
+    "PsSetCreateThreadNotifyRoutine",
+    "PsSetLoadImageNotifyRoutine",
+    "ZwDeleteFile",
+    "ZwSetInformationFile",
+    "ZwQuerySystemInformation",
+    "NtQuerySystemInformation",
+    "ZwAllocateVirtualMemory",
+    "ZwProtectVirtualMemory",
+    "ZwFreeVirtualMemory",
+    "ZwMapViewOfSection",
+    "ZwUnmapViewOfSection",
+    "__writemsr",
+    "__readmsr",
+    "HalGetBusDataByOffset",
+    "IoGetDeviceObjectPointer",
+    "MmCopyMemory",
+    "MmCopyVirtualMemory",
+    "RtlCopyMemory",
+}
 
-def generate_yara(result: Tier2Result, output_path: Optional[str] = None) -> str:
+
+def generate_yara(result: Tier2Result, output_path: Optional[str] = None,
+                   profile=None) -> str:
     """Generate YARA rules from a Tier2Result.
 
     Args:
         result: Complete Tier 2 analysis result
         output_path: Optional path to write the .yar file
+        profile: Optional DriverProfile for device names and import enrichment
 
     Returns:
         YARA rule text
     """
     rules = []
 
-    # Rule 1: IOCTL fingerprint
+    # Rule 1: IOCTL fingerprint (enriched with profile data when available)
     if result.ioctls:
-        rule = _generate_ioctl_rule(result)
+        rule = _generate_ioctl_rule(result, profile=profile)
         if rule:
             rules.append(rule)
 
@@ -67,8 +107,35 @@ def _ioctl_to_le_hex(code: int) -> str:
     return " ".join(f"{b:02X}" for b in packed)
 
 
-def _generate_ioctl_rule(result: Tier2Result) -> str:
-    """Generate a YARA rule matching the driver's IOCTL codes."""
+def _collect_capabilities(ioctls) -> list:
+    """Collect unique IOCTL auto-labels as a sorted capability list."""
+    caps = set()
+    for ioctl in ioctls:
+        if ioctl.label:
+            caps.add(ioctl.label.strip())
+    return sorted(caps)
+
+
+def _get_dangerous_imports_from_profile(profile) -> list:
+    """Extract dangerous imports from a DriverProfile's ntoskrnl imports."""
+    if profile is None:
+        return []
+    found = []
+    for imp in getattr(profile, "ntoskrnl_imports", []):
+        if imp in DANGEROUS_IMPORTS:
+            found.append(imp)
+    return sorted(set(found))
+
+
+def _generate_ioctl_rule(result: Tier2Result, profile=None) -> str:
+    """Generate a YARA rule matching the driver's IOCTL codes.
+
+    When *profile* is provided, the rule follows TheDebugger's output format:
+    - $dev strings for device names
+    - $imp strings for dangerous imports
+    - $ioctl strings for IOCTL codes in LE hex
+    - capabilities meta field from IOCTL auto-labels
+    """
     name = _sanitize_name(result.driver_name)
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -81,38 +148,94 @@ def _generate_ioctl_rule(result: Tier2Result) -> str:
     if not sorted_ioctls:
         return ""
 
-    conditions = []
-    strings = []
+    # ── Meta ──
+    capabilities = _collect_capabilities(result.ioctls)
+    meta_lines = [
+        f'        description = "DriverAtlas: IOCTL codes for {result.driver_name}"',
+        f'        author = "DriverAtlas auto-generator"',
+        f'        date = "{date}"',
+        f'        sha256 = "{result.sha256}"',
+        f'        ioctl_count = {len(result.ioctls)}',
+    ]
+    if capabilities:
+        meta_lines.append(
+            f'        capabilities = "{", ".join(capabilities)}"'
+        )
 
-    for idx, ioctl in enumerate(sorted_ioctls):
-        var_name = f"$ioctl_{idx}"
+    # ── Strings ──
+    strings = []
+    idx_counter = 1  # TheDebugger uses 1-based numbering
+
+    # Device name strings (from profile)
+    dev_vars = []
+    if profile is not None:
+        device_names = getattr(profile, "device_names", [])
+        for dev_name in device_names:
+            var_name = f"$dev{idx_counter}"
+            strings.append(f'        {var_name} = "{dev_name}" ascii wide')
+            dev_vars.append(var_name)
+            idx_counter += 1
+
+    # Dangerous import strings (from profile)
+    imp_vars = []
+    if profile is not None:
+        dangerous = _get_dangerous_imports_from_profile(profile)
+        for imp_name in dangerous:
+            var_name = f"$imp{idx_counter}"
+            strings.append(f'        {var_name} = "{imp_name}" ascii')
+            imp_vars.append(var_name)
+            idx_counter += 1
+
+    # IOCTL codes as LE hex
+    ioctl_vars = []
+    for ioctl in sorted_ioctls:
+        var_name = f"$ioctl{idx_counter}"
         hex_str = _ioctl_to_le_hex(ioctl.code)
         comment = f"// {ioctl.code_hex}"
         if ioctl.label:
             comment += f" ({ioctl.label})"
         strings.append(f"        {var_name} = {{ {hex_str} }} {comment}")
+        ioctl_vars.append(var_name)
+        idx_counter += 1
 
-    # Require at least 2 IOCTLs to match (reduce FPs)
-    min_match = min(2, len(sorted_ioctls))
-    conditions.append(f"{min_match} of ($ioctl_*)")
+    # ── Condition ──
+    cond_parts = ["uint16(0) == 0x5A4D"]
+
+    if profile is not None and dev_vars:
+        # Require all device names
+        cond_parts.extend(dev_vars)
+
+    if profile is not None and imp_vars:
+        # Require any dangerous import
+        cond_parts.append(
+            "(" + " or ".join(imp_vars) + ")"
+        )
+
+    if ioctl_vars:
+        if profile is not None:
+            # TheDebugger style: any IOCTL match
+            cond_parts.append(
+                "(" + " or ".join(ioctl_vars) + ")"
+            )
+        else:
+            # Original behavior: require minimum N matches
+            min_match = min(2, len(ioctl_vars))
+            cond_parts.append(f"{min_match} of ($ioctl*)")
 
     strings_block = "\n".join(strings)
-    condition_block = " and ".join(conditions)
+    meta_block = "\n".join(meta_lines)
+    condition_block = " and ".join(cond_parts)
 
     return f"""rule DriverAtlas_{name}_IOCTLs
 {{
     meta:
-        description = "DriverAtlas: IOCTL codes for {result.driver_name}"
-        author = "DriverAtlas auto-generator"
-        date = "{date}"
-        sha256 = "{result.sha256}"
-        ioctl_count = {len(result.ioctls)}
+{meta_block}
 
     strings:
 {strings_block}
 
     condition:
-        uint16(0) == 0x5A4D and {condition_block}
+        {condition_block}
 }}"""
 
 
