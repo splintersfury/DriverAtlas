@@ -94,4 +94,15 @@ class Corpus:
             "sections": profile.sections,
         }
 
+        # Include Tier 2 data if available
+        tier2 = getattr(profile, "tier2", None)
+        if tier2:
+            data["tier2"] = {
+                "ioctl_count": tier2.get("ioctl_count", 0),
+                "neither_io_count": tier2.get("neither_io_count", 0),
+                "taint_path_count": tier2.get("taint_path_count", 0),
+                "missing_checks_count": tier2.get("missing_checks_count", 0),
+                "gadget_count": tier2.get("gadget_count", 0),
+            }
+
         return self.save_entry(category, slug, data)

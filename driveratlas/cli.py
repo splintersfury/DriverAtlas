@@ -655,3 +655,206 @@ def corpus(category):
                 console.print(f"  {name}: {fw} ({vendor})")
             else:
                 console.print(f"  {name}")
+
+
+@main.command()
+@click.argument("driver_path", type=click.Path(exists=True))
+@click.option("--ghidra-home", envvar="GHIDRA_HOME", help="Ghidra install directory")
+@click.option("--output", "-o", type=click.Path(), help="Output directory for results")
+@click.option("--pdb", type=click.Path(exists=True), help="PDB symbol file")
+@click.option("--timeout", default=600, help="Ghidra timeout in seconds")
+@click.option("--gadgets/--no-gadgets", default=True, help="Scan for ROP/JOP gadgets")
+@click.option("--yara", type=click.Path(), help="Write YARA rules to this path")
+@click.option("--json-output", is_flag=True, help="Output raw JSON instead of table")
+def deep(driver_path, ghidra_home, output, pdb, timeout, gadgets, yara, json_output):
+    """Tier 2 deep analysis — Ghidra-powered dispatch, taint, gadgets, and YARA."""
+    import hashlib
+    from .tier2 import Tier2Result, IOCTLInfo
+    from .tier2.ghidra_runner import GhidraRunner
+    from .tier2.ioctl_analyzer import parse_dispatch_table, summarize_ioctls, device_type_name
+    from .tier2.taint_analyzer import analyze_taint, analyze_security_checks
+    from .tier2.gadget_scanner import scan_gadgets, generate_gadget_summary
+    from .tier2.yara_generator import generate_yara
+
+    # Compute SHA256
+    with open(driver_path, "rb") as f:
+        sha256 = hashlib.sha256(f.read()).hexdigest()
+
+    try:
+        runner = GhidraRunner(ghidra_home=ghidra_home, timeout=timeout)
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/]")
+        raise SystemExit(1)
+
+    console.print(f"[bold]Ghidra {runner.version()}[/] — analyzing [cyan]{os.path.basename(driver_path)}[/]")
+
+    dispatch_data = runner.analyze(driver_path, output_dir=output, pdb_path=pdb)
+
+    if "error" in dispatch_data and not dispatch_data.get("irp_handlers"):
+        console.print(f"[red]Analysis failed: {dispatch_data['error']}[/]")
+        raise SystemExit(1)
+
+    # Phase 1: Parse IOCTLs
+    ioctls = parse_dispatch_table(dispatch_data)
+    irp_handlers = dispatch_data.get("irp_handlers", {})
+
+    # Phase 2: Taint analysis + security checks
+    taint_paths = analyze_taint(dispatch_data)
+    security_checks = analyze_security_checks(dispatch_data)
+
+    # Phase 3: Gadget scanning
+    gadget_list = []
+    gadget_summary = {"total": 0}
+    if gadgets:
+        console.print("[dim]Scanning for ROP/JOP gadgets...[/]")
+        gadget_list = scan_gadgets(driver_path, max_gadgets=500)
+        gadget_summary = generate_gadget_summary(gadget_list)
+
+    # Build Tier2Result
+    result = Tier2Result(
+        driver_name=os.path.basename(driver_path),
+        sha256=sha256,
+        driver_entry_addr=dispatch_data.get("driver_entry", ""),
+        irp_handlers=irp_handlers,
+        ioctls=ioctls,
+        taint_paths=taint_paths,
+        security_checks=security_checks,
+        gadgets=gadget_list,
+        ghidra_version=runner.version(),
+        analysis_seconds=dispatch_data.get("_analysis_seconds", 0),
+    )
+
+    # Phase 4: YARA generation
+    if yara:
+        yara_text = generate_yara(result, output_path=yara)
+        if yara_text:
+            console.print(f"[green]YARA rules written to {yara}[/]")
+
+    if json_output:
+        click.echo(json.dumps(result.to_dict(), indent=2))
+        return
+
+    # ── Display results ──
+
+    # IRP handlers table
+    if irp_handlers:
+        t = Table(title="IRP Dispatch Table", show_lines=True)
+        t.add_column("IRP Major", style="cyan")
+        t.add_column("Handler", style="green")
+        t.add_column("Address", style="dim")
+
+        for irp_name in sorted(irp_handlers, key=lambda k: irp_handlers[k].get("index", 99)):
+            info = irp_handlers[irp_name]
+            t.add_row(irp_name, info["handler_name"], info.get("handler_addr", ""))
+
+        console.print(t)
+    else:
+        console.print("[yellow]No IRP handlers found[/]")
+
+    # IOCTL table
+    if ioctls:
+        t = Table(title=f"IOCTL Dispatch ({len(ioctls)} codes)", show_lines=True)
+        t.add_column("Code", style="cyan")
+        t.add_column("Device", style="dim")
+        t.add_column("Func", justify="right")
+        t.add_column("Method", style="bold")
+        t.add_column("Access")
+        t.add_column("Handler", style="green")
+        t.add_column("APIs", style="yellow")
+        t.add_column("Label", style="magenta")
+
+        for ioctl in ioctls:
+            method_style = "[red]NEITHER[/]" if ioctl.uses_neither_io else ioctl.method.name
+            dt_name = device_type_name(ioctl.device_type)
+            dt_short = dt_name.replace("FILE_DEVICE_", "").replace("VENDOR_DEFINED", "VENDOR")
+
+            t.add_row(
+                ioctl.code_hex,
+                dt_short,
+                str(ioctl.function),
+                method_style,
+                ioctl.access.name,
+                ioctl.handler_name[:40] if ioctl.handler_name else "",
+                ", ".join(ioctl.api_calls[:3]) if ioctl.api_calls else "",
+                ioctl.label or "",
+            )
+
+        console.print(t)
+
+        summary = summarize_ioctls(ioctls)
+        risk = summary.get("risk_indicators", {})
+        console.print(f"\n[bold]IOCTL Summary:[/] {summary['total']} IOCTLs")
+        console.print(f"  Methods: {summary['methods']}")
+        if risk.get("neither_io"):
+            console.print(f"  [red]NEITHER I/O: {risk['neither_io']} (raw user pointers)[/]")
+        if risk.get("has_mmio"):
+            console.print(f"  [red]Physical memory mapping detected[/]")
+        if risk.get("has_msr"):
+            console.print(f"  [red]MSR access detected[/]")
+        if risk.get("has_process_access"):
+            console.print(f"  [yellow]Process manipulation detected[/]")
+    else:
+        console.print("[yellow]No IOCTL codes found[/]")
+
+    # Taint paths table
+    if taint_paths:
+        t = Table(title=f"Taint Paths ({len(taint_paths)} flows)", show_lines=True)
+        t.add_column("IOCTL", style="cyan")
+        t.add_column("Source", style="yellow")
+        t.add_column("Sink", style="red")
+        t.add_column("Confidence", justify="right")
+        t.add_column("Description")
+
+        for tp in sorted(taint_paths, key=lambda x: -x.confidence):
+            conf_style = "[red]" if tp.confidence >= 0.7 else "[yellow]" if tp.confidence >= 0.5 else "[dim]"
+            t.add_row(
+                tp.ioctl_code,
+                tp.source,
+                tp.sink,
+                f"{conf_style}{tp.confidence:.0%}[/]",
+                tp.path_description[:60],
+            )
+
+        console.print(t)
+
+    # Security checks summary
+    if security_checks:
+        missing = [c for c in security_checks if not c.present]
+        present = [c for c in security_checks if c.present]
+
+        if missing:
+            # Group by check type
+            missing_types = {}
+            for c in missing:
+                missing_types.setdefault(c.check_type, []).append(c.ioctl_code)
+
+            t = Table(title=f"Missing Security Checks ({len(missing_types)} types)", show_lines=True)
+            t.add_column("Check", style="red")
+            t.add_column("Severity", style="bold")
+            t.add_column("Affected IOCTLs")
+
+            for check_type, codes in sorted(missing_types.items()):
+                sev = next((c.severity for c in missing if c.check_type == check_type), "medium")
+                sev_style = {"critical": "[red]", "high": "[red]", "medium": "[yellow]", "low": "[dim]"}.get(sev, "")
+                t.add_row(
+                    check_type,
+                    f"{sev_style}{sev}[/]",
+                    ", ".join(codes[:5]) + (f" +{len(codes)-5}" if len(codes) > 5 else ""),
+                )
+
+            console.print(t)
+
+        console.print(f"  Security checks: [green]{len(present)} present[/], [red]{len(missing)} missing[/]")
+
+    # Gadget summary
+    if gadget_summary.get("total"):
+        console.print(f"\n[bold]Gadgets:[/] {gadget_summary['total']} found ({gadget_summary.get('by_type', {})})")
+        interesting = gadget_summary.get("interesting", [])
+        if interesting:
+            console.print(f"  [yellow]Interesting gadgets ({len(interesting)}):[/]")
+            for g in interesting[:10]:
+                console.print(f"    {g['address']}: {g['disassembly']}")
+
+    elapsed = dispatch_data.get("_analysis_seconds", 0)
+    if elapsed:
+        console.print(f"\n[dim]Analysis completed in {elapsed:.1f}s[/]")

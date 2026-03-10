@@ -71,6 +71,12 @@ class AttackSurfaceScorer:
             "framework_equals": self._check_framework_equals,
             "signer_not_microsoft": self._check_signer_not_microsoft,
             "signer_is_microsoft": self._check_signer_is_microsoft,
+            # Tier 2 checks (require tier2 dict on profile)
+            "tier2_neither_io_count": self._check_tier2_neither_io,
+            "tier2_ioctl_count_above": self._check_tier2_ioctl_count,
+            "tier2_has_taint_sink": self._check_tier2_taint_sink,
+            "tier2_missing_check_type": self._check_tier2_missing_check,
+            "tier2_gadget_count_above": self._check_tier2_gadget_count,
         }
 
     def score(self, profile) -> AttackSurfaceScore:
@@ -200,3 +206,43 @@ class AttackSurfaceScorer:
             return False
         lower = signer.lower()
         return any(kw in lower for kw in _MICROSOFT_SIGNER_KEYWORDS)
+
+    # ── Tier 2 check evaluators ──────────────────────────────────────
+
+    @staticmethod
+    def _get_tier2(profile) -> dict:
+        return getattr(profile, "tier2", None) or {}
+
+    @classmethod
+    def _check_tier2_neither_io(cls, profile, _flat, params) -> bool:
+        t2 = cls._get_tier2(profile)
+        return t2.get("neither_io_count", 0) >= int(params)
+
+    @classmethod
+    def _check_tier2_ioctl_count(cls, profile, _flat, params) -> bool:
+        t2 = cls._get_tier2(profile)
+        return t2.get("ioctl_count", 0) > int(params)
+
+    @classmethod
+    def _check_tier2_taint_sink(cls, profile, _flat, params) -> bool:
+        t2 = cls._get_tier2(profile)
+        taint_paths = t2.get("taint_paths", [])
+        if not isinstance(params, list):
+            params = [params]
+        return any(
+            tp.get("sink") in params for tp in taint_paths
+        )
+
+    @classmethod
+    def _check_tier2_missing_check(cls, profile, _flat, params) -> bool:
+        t2 = cls._get_tier2(profile)
+        security_checks = t2.get("security_checks", [])
+        return any(
+            sc.get("check_type") == str(params) and not sc.get("present")
+            for sc in security_checks
+        )
+
+    @classmethod
+    def _check_tier2_gadget_count(cls, profile, _flat, params) -> bool:
+        t2 = cls._get_tier2(profile)
+        return t2.get("gadget_count", 0) > int(params)

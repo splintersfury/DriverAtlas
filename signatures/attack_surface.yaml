@@ -155,3 +155,47 @@ rules:
     description: No device names found — likely not directly usermode-accessible
     check: no_device_names
     weight: -3.0
+
+  # ── Tier 2 deep analysis signals (require Ghidra) ────────────────
+
+  - id: tier2_neither_io
+    description: "Tier 2: IOCTL uses METHOD_NEITHER (raw user pointers)"
+    check: tier2_neither_io_count
+    params: 1
+    weight: 4.0
+
+  - id: tier2_many_ioctls
+    description: "Tier 2: Large IOCTL surface (>20 codes)"
+    check: tier2_ioctl_count_above
+    params: 20
+    weight: 2.0
+
+  - id: tier2_taint_mmio
+    description: "Tier 2: Taint path to MmMapIoSpace"
+    check: tier2_has_taint_sink
+    params: MmMapIoSpace
+    weight: 5.0
+
+  - id: tier2_taint_process
+    description: "Tier 2: Taint path to process manipulation"
+    check: tier2_has_taint_sink
+    params: [ZwOpenProcess, KeStackAttachProcess, ZwDuplicateObject]
+    weight: 4.0
+
+  - id: tier2_taint_msr
+    description: "Tier 2: Taint path to MSR write"
+    check: tier2_has_taint_sink
+    params: __writemsr
+    weight: 5.0
+
+  - id: tier2_missing_checks
+    description: "Tier 2: Missing input length validation in IOCTL handlers"
+    check: tier2_missing_check_type
+    params: input_length_validation
+    weight: 3.0
+
+  - id: tier2_has_gadgets
+    description: "Tier 2: Exploitable ROP gadgets available"
+    check: tier2_gadget_count_above
+    params: 50
+    weight: 1.0

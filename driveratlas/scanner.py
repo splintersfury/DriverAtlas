@@ -72,6 +72,9 @@ class DriverProfile:
     # Sections
     sections: list = field(default_factory=list)
 
+    # Tier 2 deep analysis (populated by driveratlas.tier2)
+    tier2: Optional[dict] = None
+
     def to_dict(self) -> dict:
         d = asdict(self)
         if d.get("timestamp"):
