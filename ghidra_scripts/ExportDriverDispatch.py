@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ExportDriverDispatch.py
 # Ghidra headless Jython script (Python 2)
 #
@@ -353,6 +354,56 @@ def _resolve_func_addr(func_name, program):
     return ""
 
 
+def _extract_ioctl_codes_from_code(code):
+    """Extract IOCTL/FSCTL code values from decompiled C code."""
+    all_codes = set()
+
+    cases = re.findall(r'case\s+(0x[0-9a-fA-F]+)\s*:', code)
+    for c in cases:
+        try:
+            all_codes.add(int(c, 16))
+        except ValueError:
+            pass
+
+    ifs = re.findall(r'==\s*(0x[0-9a-fA-F]{5,8})', code)
+    for c in ifs:
+        try:
+            all_codes.add(int(c, 16))
+        except ValueError:
+            pass
+
+    io_cmp = re.findall(r'IoControlCode\s*(?:==|!=)\s*(0x[0-9a-fA-F]+)', code)
+    for c in io_cmp:
+        try:
+            all_codes.add(int(c, 16))
+        except ValueError:
+            pass
+
+    # Ghidra decompiler often outputs IOCTL codes as signed negative hex
+    # e.g., iVar == -0x7f79dff9  which is 0x80862007 unsigned
+    neg_matches = re.findall(r'==\s*-(0x[0-9a-fA-F]{5,8})', code)
+    for c in neg_matches:
+        try:
+            neg_val = int(c, 16)
+            unsigned_val = (-neg_val) & 0xFFFFFFFF
+            all_codes.add(unsigned_val)
+        except ValueError:
+            pass
+
+    # Also match case -0xNNNNN:
+    neg_cases = re.findall(r'case\s*-(0x[0-9a-fA-F]+)\s*:', code)
+    for c in neg_cases:
+        try:
+            neg_val = int(c, 16)
+            unsigned_val = (-neg_val) & 0xFFFFFFFF
+            all_codes.add(unsigned_val)
+        except ValueError:
+            pass
+
+    # Filter: valid IOCTL codes are >= 0x10000
+    return set(val for val in all_codes if 0x10000 <= val <= 0xFFFFFFFF)
+
+
 def extract_ioctl_dispatch(handler_name, handler_addr, program, decomplib):
     """Trace a handler function to extract IOCTL/FSCTL code dispatch."""
     fm = program.getFunctionManager()
@@ -379,42 +430,54 @@ def extract_ioctl_dispatch(handler_name, handler_addr, program, decomplib):
     if not code:
         return ioctl_dispatch
 
-    # Extract IOCTL/FSCTL codes from various comparison patterns
-    all_codes = set()
+    filtered_codes = _extract_ioctl_codes_from_code(code)
 
-    cases = re.findall(r'case\s+(0x[0-9a-fA-F]+)\s*:', code)
-    for c in cases:
-        try:
-            all_codes.add(int(c, 16))
-        except ValueError:
-            pass
+    # If no IOCTLs found in the handler itself, scan its callees (1 level deep)
+    # This is common: DeviceControl handler calls a sub-function with the switch
+    callee_code_map = {}
+    if not filtered_codes:
+        print("[ExportDriverDispatch] No IOCTLs in %s, scanning callees..." % handler_name)
+        callees = func.getCalledFunctions(ConsoleTaskMonitor())
+        for callee in callees:
+            callee_full = callee.getName(True)
+            ccode = decompile_function(decomplib, callee)
+            if not ccode:
+                continue
+            callee_codes = _extract_ioctl_codes_from_code(ccode)
+            if callee_codes:
+                print("[ExportDriverDispatch]   Found %d IOCTLs in callee %s"
+                      % (len(callee_codes), callee_full))
+                filtered_codes.update(callee_codes)
+                callee_code_map[callee_full] = ccode
 
-    ifs = re.findall(r'==\s*(0x[0-9a-fA-F]{5,8})', code)
-    for c in ifs:
-        try:
-            all_codes.add(int(c, 16))
-        except ValueError:
-            pass
+                # Also check sub-callees (2 levels deep for deeply nested dispatch)
+                sub_callees = callee.getCalledFunctions(ConsoleTaskMonitor())
+                for sub in sub_callees:
+                    sub_full = sub.getName(True)
+                    if sub_full in callee_code_map:
+                        continue
+                    scode = decompile_function(decomplib, sub)
+                    if not scode:
+                        continue
+                    sub_codes = _extract_ioctl_codes_from_code(scode)
+                    if sub_codes:
+                        print("[ExportDriverDispatch]     Found %d IOCTLs in sub-callee %s"
+                              % (len(sub_codes), sub_full))
+                        filtered_codes.update(sub_codes)
+                        callee_code_map[sub_full] = scode
 
-    io_cmp = re.findall(r'IoControlCode\s*(?:==|!=)\s*(0x[0-9a-fA-F]+)', code)
-    for c in io_cmp:
-        try:
-            all_codes.add(int(c, 16))
-        except ValueError:
-            pass
-
-    filtered_codes = set()
-    for val in all_codes:
-        if 0x10000 <= val <= 0xFFFFFFFF:
-            filtered_codes.add(val)
+    # Combine all code sources for snippet extraction
+    all_code = code
+    for ccode in callee_code_map.values():
+        all_code = all_code + "\n" + ccode
 
     print("[ExportDriverDispatch] Found %d IOCTL/FSCTL code candidates in %s"
           % (len(filtered_codes), handler_name))
 
     for ioctl_code in sorted(filtered_codes):
         code_hex = "0x%X" % ioctl_code
-        snippet = _extract_snippet(code, code_hex)
-        handler_func = _find_case_handler(code, code_hex, program)
+        snippet = _extract_snippet(all_code, code_hex)
+        handler_func = _find_case_handler(all_code, code_hex, program)
 
         # DriverAtlas Tier 2: extract API calls from the IOCTL handler
         api_calls = _extract_api_calls_from_snippet(snippet)
@@ -475,23 +538,40 @@ def extract_ioctl_from_all_dispatch_functions(program, decomplib, irp_handlers):
     return ioctl_dispatch
 
 
+def _ioctl_hex_variants(ioctl_hex):
+    """Return all hex string variants of an IOCTL code (positive + negative)."""
+    variants = [ioctl_hex, ioctl_hex.lower(), ioctl_hex.upper()]
+    try:
+        val = int(ioctl_hex, 16)
+        # Compute the signed negative representation Ghidra might use
+        if val > 0x7FFFFFFF:
+            neg_val = val - 0x100000000  # e.g., 0x80862007 -> -0x7f79dff9
+            neg_hex = "-0x%x" % (-neg_val)
+            variants.append(neg_hex)
+            variants.append(neg_hex.upper().replace("0X", "0x"))
+    except ValueError:
+        pass
+    return variants
+
+
 def _extract_snippet(code, ioctl_hex):
     """Extract a code snippet around an IOCTL code reference."""
-    idx = code.find(ioctl_hex)
-    if idx < 0:
-        idx = code.lower().find(ioctl_hex.lower())
-    if idx < 0:
-        return ""
-    start = max(0, idx - 200)
-    end = min(len(code), idx + 300)
-    return code[start:end]
+    for variant in _ioctl_hex_variants(ioctl_hex):
+        idx = code.find(variant)
+        if idx >= 0:
+            start = max(0, idx - 200)
+            end = min(len(code), idx + 300)
+            return code[start:end]
+    return ""
 
 
 def _find_case_handler(code, ioctl_hex, program):
     """Try to find the function called in a case block for an IOCTL code."""
-    idx = code.find(ioctl_hex)
-    if idx < 0:
-        idx = code.lower().find(ioctl_hex.lower())
+    idx = -1
+    for variant in _ioctl_hex_variants(ioctl_hex):
+        idx = code.find(variant)
+        if idx >= 0:
+            break
     if idx < 0:
         return ""
 
@@ -658,7 +738,7 @@ def run():
         if k not in ioctl_dispatch:
             ioctl_dispatch[k] = v
 
-    # Phase 5: Final fallback — scan ALL functions for IOCTL patterns
+    # Phase 5: Final fallback -- scan ALL functions for IOCTL patterns
     if not ioctl_dispatch:
         print("[ExportDriverDispatch] No IOCTLs found yet, scanning all functions...")
         fm = program.getFunctionManager()
