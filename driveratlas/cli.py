@@ -916,3 +916,122 @@ def _get_image_base(driver_path: str) -> int:
         return base
     except Exception:
         return 0
+
+
+@main.command()
+@click.option("--vt-key", envvar="VT_API_KEY", help="VirusTotal API key")
+@click.option("--work-dir", default=None, help="Working directory for downloads and results")
+@click.option("--ghidra-home", envvar="GHIDRA_HOME", help="Ghidra install directory")
+@click.option("--max-drivers", default=0, type=int, help="Limit number of drivers (0 = all)")
+@click.option("--tier2/--no-tier2", default=True, help="Run Tier 2 Ghidra analysis")
+@click.option("--download-only", is_flag=True, help="Only download binaries, skip analysis")
+@click.option("--export-md", type=click.Path(), help="Export KernelSight markdown to this path")
+@click.option("--resume/--no-resume", default=True, help="Resume from previous run")
+def loldrivers(vt_key, work_dir, ghidra_home, max_drivers, tier2, download_only, export_md, resume):
+    """Batch-analyze every driver in the LOLDrivers.io catalog.
+
+    Downloads binaries from VirusTotal, runs Tier 1 + Tier 2 analysis,
+    and exports results for KernelSight publication.
+    """
+    from .loldrivers_pipeline import (
+        fetch_loldrivers_catalog, batch_download, run_tier1, run_tier2,
+        run_pipeline, export_kernelsight_markdown, DEFAULT_WORK_DIR,
+    )
+
+    work = work_dir or DEFAULT_WORK_DIR
+
+    # Load VT key
+    if not vt_key:
+        vt_key_path = os.path.expanduser("~/.vt_api_key")
+        if os.path.exists(vt_key_path):
+            with open(vt_key_path) as f:
+                vt_key = f.read().strip()
+    if not vt_key:
+        console.print("[red]VT API key required. Set VT_API_KEY or use --vt-key.[/]")
+        raise SystemExit(1)
+
+    # Fetch catalog first to show stats
+    entries = fetch_loldrivers_catalog(work)
+    vuln = sum(1 for e in entries if e.category == "vulnerable driver")
+    mal = sum(1 for e in entries if e.category == "malicious")
+    console.print(f"[*] LOLDrivers catalog: {len(entries)} unique hashes "
+                  f"({vuln} vulnerable, {mal} malicious)")
+
+    if download_only:
+        console.print("[*] Download-only mode")
+        downloaded = batch_download(
+            entries, vt_key, os.path.join(work, "binaries"),
+            max_drivers=max_drivers,
+        )
+        console.print(f"[+] Downloaded {len(downloaded)} binaries to {work}/binaries/")
+        return
+
+    # Export only (from existing results)
+    results_path = os.path.join(work, "results.json")
+    if export_md and os.path.exists(results_path):
+        export_kernelsight_markdown(results_path, export_md)
+        console.print(f"[+] KernelSight page exported to {export_md}")
+        return
+
+    # Full pipeline
+    console.print(f"[*] Running pipeline (tier2={'yes' if tier2 else 'no'}, "
+                  f"max={max_drivers or 'all'}, resume={resume})")
+    console.print(f"[*] Work directory: {work}")
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    results = run_pipeline(
+        vt_api_key=vt_key,
+        work_dir=work,
+        ghidra_home=ghidra_home,
+        max_drivers=max_drivers,
+        tier2_enabled=tier2,
+        resume=resume,
+    )
+
+    # Summary
+    t1_ok = sum(1 for r in results if r.get("tier1_ok"))
+    t2_ok = sum(1 for r in results if r.get("tier2_ok"))
+    failed = sum(1 for r in results if r.get("error"))
+    console.print(f"\n[*] Pipeline complete:")
+    console.print(f"  Tier 1 scanned: {t1_ok}")
+    console.print(f"  Tier 2 analyzed: {t2_ok}")
+    console.print(f"  Failed: {failed}")
+    console.print(f"  Results: {results_path}")
+
+    # Auto-export if path given
+    if export_md:
+        export_kernelsight_markdown(results_path, export_md)
+        console.print(f"[+] KernelSight page exported to {export_md}")
+
+    # Print top 10 by score
+    scored = sorted(
+        [r for r in results if r.get("tier1_ok")],
+        key=lambda r: r.get("score", 0),
+        reverse=True,
+    )[:10]
+    if scored:
+        console.print(f"\n[bold]Top 10 by Attack Surface Score:[/]")
+        t = Table(show_lines=True)
+        t.add_column("#", width=3)
+        t.add_column("Driver", style="cyan")
+        t.add_column("Score", justify="right")
+        t.add_column("Category")
+        t.add_column("IOCTLs", justify="right")
+        t.add_column("NEITHER", justify="right")
+        t.add_column("Gadgets", justify="right")
+        t.add_column("Mitigations OFF")
+
+        for i, r in enumerate(scored, 1):
+            score = r.get("score", 0)
+            score_str = f"[red]{score:.1f}[/]" if score >= 8 else f"{score:.1f}"
+            t.add_row(
+                str(i),
+                r.get("driver_name", r["sha256"][:12]),
+                score_str,
+                r.get("lol_category", "")[:12],
+                str(r.get("ioctl_count", "-")),
+                str(r.get("neither_io_count", "-")),
+                str(r.get("gadget_total", "-")),
+                ", ".join(r.get("mitigations_off", [])),
+            )
+        console.print(t)
