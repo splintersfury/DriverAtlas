@@ -638,3 +638,216 @@ def export_kernelsight_markdown(
 
     logger.info(f"KernelSight page written to {output_path}")
     return output_path
+
+
+def export_kdu_markdown(
+    results_path: str,
+    output_path: str,
+) -> str:
+    """Generate KDU compatibility analysis page from analysis results.
+
+    Args:
+        results_path: Path to results.json
+        output_path: Path to write the markdown file
+
+    Returns:
+        Path to generated markdown
+    """
+    from .tier2.kdu_scorer import score_batch
+
+    with open(results_path, "r") as f:
+        results = json.load(f)
+
+    scores = score_batch(results)
+    compatible = [s for s in scores if s.kdu_compatible]
+    confirmed = [s for s in compatible if s.confidence == "confirmed"]
+    likely = [s for s in compatible if s.confidence == "likely"]
+
+    # Group by action type
+    from collections import Counter
+    action_counts = Counter(s.best_action for s in compatible)
+
+    # Separate by action type for tables
+    map_driver = [s for s in compatible if s.best_action == "MapDriver"]
+    map_brute = [s for s in compatible if s.best_action == "MapDriver (physical brute-force)"]
+    dkom = [s for s in compatible if s.best_action in ("DKOM", "DSECorruption")]
+    dump = [s for s in compatible if s.best_action == "DumpProcess"]
+
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    lines = []
+    w = lines.append
+
+    w("---")
+    w("title: KDU Provider Compatibility Analysis")
+    w("description: Which LOLDrivers could be weaponized as KDU providers? Automated analysis of 1,775 drivers.")
+    w("---")
+    w("")
+    w("# KDU Provider Compatibility Analysis")
+    w("")
+    w("Which [LOLDrivers](https://loldrivers.io) could be weaponized as "
+      "[KDU](https://github.com/hfiref0x/KDU) providers? This page answers that question "
+      "by mapping each driver's confirmed IOCTL-reachable primitives to KDU's provider requirements.")
+    w("")
+    w(f"**Last updated:** {date}  ")
+    w(f"**Drivers analyzed:** {len(results)} (Tier 1) / "
+      f"{sum(1 for r in results if r.get('tier2_ok'))} (Tier 2 Ghidra)  ")
+    w("")
+
+    w("## Key Findings")
+    w("")
+    w("| Metric | Count |")
+    w("|--------|-------|")
+    w(f"| Total drivers analyzed | {len(results):,} |")
+    w(f"| **KDU-compatible** | **{len(compatible)}** ({100*len(compatible)/len(results):.0f}%) |")
+    w(f"| Tier 2 confirmed | {len(confirmed)} |")
+    w(f"| Tier 1 likely | {len(likely)} |")
+    w(f"| MapDriver capable | {len(map_driver)} |")
+    w(f"| MapDriver (physical brute-force) | {len(map_brute)} |")
+    w(f"| DKOM / DSECorruption | {len(dkom)} |")
+    w(f"| DumpProcess | {len(dump)} |")
+    w("")
+
+    w("## What This Means")
+    w("")
+    w("KDU uses vulnerable signed drivers to load unsigned kernel code. "
+      "A driver is \"KDU-compatible\" if it exposes memory primitives through its IOCTL handlers "
+      "that an attacker can chain into kernel code execution.")
+    w("")
+    w("- **Confirmed**: Ghidra analysis verified the dangerous API is reachable from an IOCTL handler")
+    w("- **Likely**: The driver imports the API, but we haven't confirmed IOCTL reachability yet")
+    w("")
+    w("KDU supports these actions, from most to least powerful:")
+    w("")
+    w("1. **MapDriver** - Load arbitrary unsigned code into the kernel (needs physical + virtual memory R/W)")
+    w("2. **MapDriver (physical brute-force)** - Same, but uses only physical memory with PML4 brute-forcing")
+    w("3. **DKOM** - Direct Kernel Object Manipulation, e.g. hiding processes (needs virtual memory write)")
+    w("4. **DSECorruption** - Patch `ci.dll!g_CiOptions` to disable driver signature enforcement")
+    w("5. **DumpProcess** - Read arbitrary process memory (needs process handle + virtual memory read)")
+    w("")
+
+    # MapDriver confirmed table
+    map_confirmed = [s for s in map_driver if s.confidence == "confirmed"]
+    if map_confirmed:
+        w("## Confirmed MapDriver Candidates")
+        w("")
+        w(f"These {len(map_confirmed)} drivers have Ghidra-confirmed physical + virtual memory "
+          "primitives reachable from IOCTL handlers. They could load unsigned kernel code.")
+        w("")
+        w("| # | Driver | Primitives (confirmed IOCTLs) | NEITHER I/O | Mitigations OFF |")
+        w("|---|--------|------------------------------|-------------|-----------------|")
+        for i, s in enumerate(map_confirmed, 1):
+            name = s.driver_name or s.sha256[:16]
+            # Show unique IOCTL codes with confirmed primitives
+            confirmed_ioctls = set()
+            for p in s.primitives:
+                if p.confidence == "high" and p.ioctl_code != "unknown":
+                    confirmed_ioctls.add(p.ioctl_code)
+            ioctl_str = ", ".join(sorted(confirmed_ioctls)[:4])
+            if len(confirmed_ioctls) > 4:
+                ioctl_str += f" (+{len(confirmed_ioctls)-4})"
+            prim_types = sorted(set(p.primitive_type for p in s.primitives if p.confidence == "high"))
+            prim_short = ", ".join(p.replace("Physical", "Phys").replace("Memory", "Mem")
+                                    .replace("Kernel", "K").replace("Virtual", "V")
+                                    for p in prim_types)
+            neither = "YES" if s.has_neither_io else ""
+            mits = ", ".join(s.missing_mitigations[:3])
+            w(f"| {i} | `{name}` | {prim_short} | {neither} | {mits} |")
+        w("")
+
+    # Physical brute-force table
+    brute_confirmed = [s for s in map_brute if s.confidence == "confirmed"]
+    if brute_confirmed:
+        w("## Confirmed Physical Brute-Force Candidates")
+        w("")
+        w(f"These {len(brute_confirmed)} drivers have confirmed physical memory R/W but lack virtual memory. "
+          "KDU can brute-force PML4 via physical scanning to achieve MapDriver.")
+        w("")
+        w("| # | Driver | Confirmed APIs | NEITHER I/O | Mitigations OFF |")
+        w("|---|--------|---------------|-------------|-----------------|")
+        for i, s in enumerate(brute_confirmed[:30], 1):
+            name = s.driver_name or s.sha256[:16]
+            apis = set()
+            for p in s.primitives:
+                if p.confidence == "high":
+                    apis.update(p.confirming_apis)
+            apis_str = ", ".join(sorted(apis)[:4])
+            neither = "YES" if s.has_neither_io else ""
+            mits = ", ".join(s.missing_mitigations[:3])
+            w(f"| {i} | `{name}` | `{apis_str}` | {neither} | {mits} |")
+        if len(brute_confirmed) > 30:
+            w(f"| ... | *{len(brute_confirmed)-30} more* | | | |")
+        w("")
+
+    # DKOM/DSE table
+    dkom_confirmed = [s for s in dkom if s.confidence == "confirmed"]
+    if dkom_confirmed:
+        w("## Confirmed DKOM / DSECorruption Candidates")
+        w("")
+        w(f"These {len(dkom_confirmed)} drivers have confirmed virtual memory write primitives. "
+          "They can manipulate kernel objects or patch `ci.dll` to disable signature enforcement.")
+        w("")
+        w("| # | Driver | Confirmed APIs | NEITHER I/O | Mitigations OFF |")
+        w("|---|--------|---------------|-------------|-----------------|")
+        for i, s in enumerate(dkom_confirmed[:30], 1):
+            name = s.driver_name or s.sha256[:16]
+            apis = set()
+            for p in s.primitives:
+                if p.confidence == "high":
+                    apis.update(p.confirming_apis)
+            apis_str = ", ".join(sorted(apis)[:4])
+            neither = "YES" if s.has_neither_io else ""
+            mits = ", ".join(s.missing_mitigations[:3])
+            w(f"| {i} | `{name}` | `{apis_str}` | {neither} | {mits} |")
+        if len(dkom_confirmed) > 30:
+            w(f"| ... | *{len(dkom_confirmed)-30} more* | | | |")
+        w("")
+
+    # Likely candidates (Tier 1 only)
+    likely_map = [s for s in map_driver if s.confidence == "likely"]
+    if likely_map:
+        w("## Likely MapDriver Candidates (Tier 1 only)")
+        w("")
+        w(f"These {len(likely_map)} drivers import the right APIs but haven't been Ghidra-confirmed yet. "
+          "The dangerous imports may be used internally rather than exposed through IOCTLs.")
+        w("")
+        w("| # | Driver | Imported Primitives | Mitigations OFF |")
+        w("|---|--------|-------------------|-----------------|")
+        for i, s in enumerate(likely_map[:30], 1):
+            name = s.driver_name or s.sha256[:16]
+            prim_types = sorted(set(p.primitive_type for p in s.primitives))
+            prim_short = ", ".join(p.replace("Physical", "Phys").replace("Memory", "Mem")
+                                    .replace("Kernel", "K").replace("Virtual", "V")
+                                    for p in prim_types)
+            mits = ", ".join(s.missing_mitigations[:3])
+            w(f"| {i} | `{name}` | {prim_short} | {mits} |")
+        if len(likely_map) > 30:
+            w(f"| ... | *{len(likely_map)-30} more* | | |")
+        w("")
+
+    # Methodology
+    w("## Methodology")
+    w("")
+    w("1. **Tier 1** (all drivers): PE parsing extracts imports, device names, IOCTLs, and mitigations")
+    w("2. **Tier 2** (Ghidra): Headless decompilation traces which imports are called from which IOCTL handlers")
+    w("3. **KDU scoring**: Maps confirmed IOCTL-reachable APIs to KDU primitive types "
+      "(ReadPhysicalMemory, WriteKernelVM, OpenProcess, etc.)")
+    w("4. **Action assessment**: Determines which KDU actions the primitives support "
+      "(MapDriver > DKOM > DSECorruption > DumpProcess)")
+    w("")
+    w("**Confirmed** = Ghidra verified the API call exists inside an IOCTL dispatch handler  ")
+    w("**Likely** = The driver imports the API, but IOCTL reachability is unverified")
+    w("")
+    w("---")
+    w("")
+    w("*Generated by [DriverAtlas](https://github.com/splintersfury/DriverAtlas) "
+      "× [KernelSight](https://splintersfury.github.io/KernelSight/)*")
+
+    output = "\n".join(lines)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write(output)
+
+    logger.info(f"KDU analysis page written to {output_path} "
+                f"({len(compatible)} compatible, {len(confirmed)} confirmed)")
+    return output_path

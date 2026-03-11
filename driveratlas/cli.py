@@ -1035,3 +1035,104 @@ def loldrivers(vt_key, work_dir, ghidra_home, max_drivers, tier2, download_only,
                 ", ".join(r.get("mitigations_off", [])),
             )
         console.print(t)
+
+
+@main.command()
+@click.argument("driver_or_results", type=click.Path(exists=True))
+@click.option("--json-output", type=click.Path(), help="Save full KDU scores to JSON")
+@click.option("--top", default=20, type=int, help="Show top N candidates")
+@click.option("--all", "show_all", is_flag=True, help="Show all compatible drivers")
+def kdu(driver_or_results, json_output, top, show_all):
+    """Score driver(s) for KDU provider compatibility.
+
+    Accepts either a single .sys driver path or a results.json from loldrivers pipeline.
+    Maps Tier 1 imports + Tier 2 IOCTL-confirmed APIs to KDU provider primitives.
+
+    \b
+    Examples:
+        driveratlas kdu path/to/driver.sys
+        driveratlas kdu ~/.driveratlas/loldrivers/results.json
+        driveratlas kdu results.json --json-output kdu_scores.json --all
+    """
+    from .tier2.kdu_scorer import score_driver, score_batch, format_kdu_report
+
+    path = driver_or_results
+
+    if path.endswith(".json"):
+        with open(path) as f:
+            results = json.load(f)
+
+        scores = score_batch(results)
+        compatible = [s for s in scores if s.kdu_compatible]
+        confirmed = [s for s in compatible if s.confidence == "confirmed"]
+
+        console.print(f"\n[bold]KDU Provider Compatibility Analysis[/]")
+        console.print(f"  Total drivers: {len(results)}")
+        console.print(f"  KDU-compatible: [red]{len(compatible)}[/]")
+        console.print(f"  Tier 2 confirmed: [red]{len(confirmed)}[/]")
+
+        from collections import Counter
+        action_counts = Counter(s.best_action for s in compatible)
+        console.print(f"\n[bold]By Action Type:[/]")
+        for action, count in action_counts.most_common():
+            console.print(f"  {action}: {count}")
+
+        to_show = compatible if show_all else compatible[:top]
+        if to_show:
+            console.print(f"\n[bold]{'All' if show_all else f'Top {top}'} KDU Candidates:[/]")
+            t = Table(show_lines=True)
+            t.add_column("#", width=3)
+            t.add_column("Driver", style="cyan")
+            t.add_column("Best Action", style="red")
+            t.add_column("Confidence")
+            t.add_column("Primitives")
+            t.add_column("NEITHER")
+            t.add_column("Mitigations OFF")
+
+            for i, s in enumerate(to_show, 1):
+                conf_style = "green" if s.confidence == "confirmed" else "yellow"
+                prim_types = sorted(set(p.primitive_type for p in s.primitives))
+                t.add_row(
+                    str(i),
+                    s.driver_name or s.sha256[:16],
+                    s.best_action,
+                    f"[{conf_style}]{s.confidence}[/{conf_style}]",
+                    ", ".join(prim_types),
+                    "YES" if s.has_neither_io else "no",
+                    ", ".join(s.missing_mitigations[:3]),
+                )
+            console.print(t)
+
+        if json_output:
+            with open(json_output, "w") as f:
+                json.dump([s.to_dict() for s in scores], f, indent=2)
+            console.print(f"\n[+] Full scores saved to {json_output}")
+
+        # Auto-generate KernelSight page
+        from .loldrivers_pipeline import export_kdu_markdown
+        kdu_page = os.path.splitext(path)[0] + "_kdu.md"
+        export_kdu_markdown(path, kdu_page)
+        console.print(f"[+] KernelSight KDU page: {kdu_page}")
+
+    else:
+        profile = scan_driver(path)
+        result = profile.to_dict()
+
+        ghidra_home = os.environ.get("GHIDRA_HOME")
+        if ghidra_home:
+            from .tier2.ghidra_runner import GhidraRunner
+            from .tier2.ioctl_analyzer import parse_dispatch_table, deep_dive_all
+
+            console.print(f"[*] Running Ghidra deep analysis on {os.path.basename(path)}...")
+            runner = GhidraRunner(ghidra_home=ghidra_home)
+            dispatch_data = runner.analyze(path)
+            if dispatch_data.get("irp_handlers"):
+                ioctls = parse_dispatch_table(dispatch_data)
+                dives = deep_dive_all(ioctls)
+                result["deep_dives"] = [d.to_dict() for d in dives]
+                result["tier2_ok"] = True
+                result["ioctl_count"] = len(ioctls)
+                result["neither_io_count"] = sum(1 for i in ioctls if i.uses_neither_io)
+
+        score = score_driver(result)
+        console.print(format_kdu_report(score))
