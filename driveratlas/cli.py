@@ -817,7 +817,8 @@ def deep(driver_path, ghidra_home, output, pdb, timeout, gadgets, yara, yara_out
 
     # ── Display: Per-IOCTL deep dive (TheDebugger style) ──
     if ioctls:
-        deep_dives = deep_dive_all(ioctls)
+        handler_irp = dispatch_data.get("handler_irp_completion", False)
+        deep_dives = deep_dive_all(ioctls, handler_irp_completion=handler_irp)
         console.print()
         for dd in deep_dives:
             # Header line
@@ -1128,7 +1129,8 @@ def kdu(driver_or_results, json_output, top, show_all):
             dispatch_data = runner.analyze(path)
             if dispatch_data.get("irp_handlers"):
                 ioctls = parse_dispatch_table(dispatch_data)
-                dives = deep_dive_all(ioctls)
+                handler_irp = dispatch_data.get("handler_irp_completion", False)
+                dives = deep_dive_all(ioctls, handler_irp_completion=handler_irp)
                 result["deep_dives"] = [d.to_dict() for d in dives]
                 result["tier2_ok"] = True
                 result["ioctl_count"] = len(ioctls)

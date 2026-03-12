@@ -317,11 +317,16 @@ def summarize_ioctls(ioctls: list) -> dict:
     }
 
 
-def deep_dive_ioctl(ioctl: IOCTLInfo) -> IOCTLDeepDive:
+def deep_dive_ioctl(ioctl: IOCTLInfo,
+                    handler_irp_completion: bool = False) -> IOCTLDeepDive:
     """Produce a per-IOCTL deep dive with categorized APIs, validation, and risk.
 
     Args:
         ioctl: A parsed IOCTLInfo object (with decompiled_snippet populated)
+        handler_irp_completion: Whether the parent DeviceControl handler (full
+            decompilation) contains IofCompleteRequest/IoCompleteRequest.
+            Used as fallback when the per-IOCTL snippet is too narrow to
+            capture the completion call.
 
     Returns:
         IOCTLDeepDive with categorized API calls, security validation status,
@@ -368,7 +373,13 @@ def deep_dive_ioctl(ioctl: IOCTLInfo) -> IOCTLDeepDive:
     validation_status = ", ".join(checks_found) if checks_found else "NONE"
 
     # --- 3. IRP completion check ---
+    # First check the per-IOCTL snippet (most specific).
+    # Fall back to the parent handler flag — IofCompleteRequest is almost
+    # always called AFTER the switch/case, outside any individual case body,
+    # so the narrow 500-char snippet rarely captures it.
     has_irp_completion = any(api in snippet for api in _IRP_COMPLETION_APIS)
+    if not has_irp_completion and handler_irp_completion:
+        has_irp_completion = True
     irp_completion_risk = "" if has_irp_completion else \
         "No IRP completion detected (may leak IRP or cause hang)"
 
@@ -403,16 +414,20 @@ def deep_dive_ioctl(ioctl: IOCTLInfo) -> IOCTLDeepDive:
     )
 
 
-def deep_dive_all(ioctls: list) -> list:
+def deep_dive_all(ioctls: list,
+                  handler_irp_completion: bool = False) -> list:
     """Run deep_dive_ioctl on every IOCTL in a list.
 
     Args:
         ioctls: List of IOCTLInfo objects
+        handler_irp_completion: Whether the parent DeviceControl handler
+            contains IRP completion calls (passed through to each deep dive)
 
     Returns:
         List of IOCTLDeepDive objects, sorted by IOCTL code
     """
-    return [deep_dive_ioctl(ioctl) for ioctl in ioctls]
+    return [deep_dive_ioctl(ioctl, handler_irp_completion=handler_irp_completion)
+            for ioctl in ioctls]
 
 
 def _assess_risk(ioctl: IOCTLInfo, api_categories: dict,

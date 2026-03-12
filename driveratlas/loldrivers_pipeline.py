@@ -352,7 +352,8 @@ def run_tier2(driver_path: str, result: AnalysisResult,
         ]
 
         # Deep dives
-        deep_dives = deep_dive_all(ioctls)
+        handler_irp = dispatch_data.get("handler_irp_completion", False)
+        deep_dives = deep_dive_all(ioctls, handler_irp_completion=handler_irp)
         result.deep_dives = [dd.to_dict() for dd in deep_dives]
 
         # Taint

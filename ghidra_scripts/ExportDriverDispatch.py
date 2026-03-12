@@ -764,11 +764,48 @@ def run():
     print("[ExportDriverDispatch] Total: %d IRP handlers, %d IOCTL codes"
           % (len(irp_handlers), len(ioctl_dispatch)))
 
+    # Check if the DeviceControl handler (full decompilation) has IRP completion.
+    # Per-IOCTL snippets are only ~500 chars around the IOCTL constant, so they
+    # almost never reach the IofCompleteRequest call which lives after the
+    # switch/case in most drivers. This flag lets the analyzer fall back to it.
+    handler_irp_completion = False
+    dc_handler = irp_handlers.get("IRP_MJ_DEVICE_CONTROL")
+    if dc_handler:
+        dc_func = None
+        dc_addr = dc_handler.get("handler_addr", "")
+        if dc_addr:
+            try:
+                addr_obj = program.getAddressFactory().getAddress(dc_addr)
+                dc_func = program.getFunctionManager().getFunctionAt(addr_obj)
+            except Exception:
+                pass
+        if not dc_func:
+            dc_name = dc_handler.get("handler_name", "")
+            syms = list(program.getSymbolTable().getSymbols(dc_name))
+            if syms:
+                dc_func = program.getFunctionManager().getFunctionAt(syms[0].getAddress())
+        if dc_func:
+            dc_code = decompile_function(decomplib, dc_func)
+            if dc_code and ("IofCompleteRequest" in dc_code or "IoCompleteRequest" in dc_code):
+                handler_irp_completion = True
+            # Also check immediate callees (completion may be in a helper)
+            if not handler_irp_completion and dc_func:
+                try:
+                    for callee in dc_func.getCalledFunctions(ConsoleTaskMonitor()):
+                        cc = decompile_function(decomplib, callee)
+                        if cc and ("IofCompleteRequest" in cc or "IoCompleteRequest" in cc):
+                            handler_irp_completion = True
+                            break
+                except Exception:
+                    pass
+    print("[ExportDriverDispatch] Handler IRP completion: %s" % handler_irp_completion)
+
     result = {
         "driver_name": program.getName(),
         "driver_entry": entry_addr,
         "irp_handlers": irp_handlers,
         "ioctl_dispatch": ioctl_dispatch,
+        "handler_irp_completion": handler_irp_completion,
     }
 
     with open(out_path, "w") as f:

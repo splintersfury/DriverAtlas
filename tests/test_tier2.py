@@ -192,6 +192,79 @@ class TestIOCTLAnalyzer:
         assert summarize_ioctls([]) == {"total": 0}
 
 
+class TestIRPCompletionFallback:
+    """Tests for the handler-level IRP completion fallback logic."""
+
+    def test_snippet_has_completion(self):
+        """IRP completion in snippet should be detected directly."""
+        from driveratlas.tier2 import IOCTLInfo
+        from driveratlas.tier2.ioctl_analyzer import deep_dive_ioctl
+
+        ioctl = IOCTLInfo.from_code(
+            0x22200C,
+            decompiled_snippet="MmMapIoSpace(a,b,c); IofCompleteRequest(Irp, 0);",
+        )
+        dd = deep_dive_ioctl(ioctl, handler_irp_completion=False)
+        assert dd.has_irp_completion is True
+        assert dd.irp_completion_risk == ""
+
+    def test_snippet_missing_but_handler_has(self):
+        """When snippet lacks completion but handler has it, should fallback."""
+        from driveratlas.tier2 import IOCTLInfo
+        from driveratlas.tier2.ioctl_analyzer import deep_dive_ioctl
+
+        ioctl = IOCTLInfo.from_code(
+            0x22200C,
+            decompiled_snippet="MmMapIoSpace(a,b,c); return STATUS_SUCCESS;",
+        )
+        # Without fallback
+        dd_no = deep_dive_ioctl(ioctl, handler_irp_completion=False)
+        assert dd_no.has_irp_completion is False
+        assert "No IRP completion" in dd_no.irp_completion_risk
+
+        # With handler fallback
+        dd_yes = deep_dive_ioctl(ioctl, handler_irp_completion=True)
+        assert dd_yes.has_irp_completion is True
+        assert dd_yes.irp_completion_risk == ""
+
+    def test_both_missing(self):
+        """When neither snippet nor handler has completion, flag it."""
+        from driveratlas.tier2 import IOCTLInfo
+        from driveratlas.tier2.ioctl_analyzer import deep_dive_ioctl
+
+        ioctl = IOCTLInfo.from_code(
+            0x22200C,
+            decompiled_snippet="return STATUS_SUCCESS;",
+        )
+        dd = deep_dive_ioctl(ioctl, handler_irp_completion=False)
+        assert dd.has_irp_completion is False
+        assert "No IRP completion" in dd.irp_completion_risk
+
+    def test_deep_dive_all_passes_flag(self):
+        """deep_dive_all should propagate handler_irp_completion to each IOCTL."""
+        from driveratlas.tier2 import IOCTLInfo
+        from driveratlas.tier2.ioctl_analyzer import deep_dive_all
+
+        ioctls = [
+            IOCTLInfo.from_code(0x22200C, decompiled_snippet="foo();"),
+            IOCTLInfo.from_code(0x22200F, decompiled_snippet="bar();"),
+        ]
+        dives = deep_dive_all(ioctls, handler_irp_completion=True)
+        assert all(dd.has_irp_completion for dd in dives)
+
+    def test_risk_string_excludes_irp_when_handler_has(self):
+        """Risk assessment should not include 'no IRP completion' when handler has it."""
+        from driveratlas.tier2 import IOCTLInfo
+        from driveratlas.tier2.ioctl_analyzer import deep_dive_ioctl
+
+        ioctl = IOCTLInfo.from_code(
+            0x22200F,  # NEITHER method
+            decompiled_snippet="MmMapIoSpace(a,b,c);",
+        )
+        dd = deep_dive_ioctl(ioctl, handler_irp_completion=True)
+        assert "no IRP completion" not in dd.risk
+
+
 # ── Taint Analyzer tests ────────────────────────────────────────────
 
 class TestTaintAnalyzer:
